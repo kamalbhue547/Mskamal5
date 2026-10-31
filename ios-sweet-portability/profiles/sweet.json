@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "sweet",
+  "name": "Xiaomi Redmi Note 10 Pro",
+  "support_level": "upstream_reference",
+  "identity": {
+    "codename": "sweet",
+    "manufacturer": "Xiaomi",
+    "model": "Redmi Note 10 Pro",
+    "soc_labels": ["SM7150", "Snapdragon 732G"]
+  },
+  "platform": {
+    "cpu_arch": "arm64"
+  },
+  "evidence": [
+    {
+      "subject": "Reference identity",
+      "url": "https://github.com/dipa-studio/ios-sweet/blob/45263bee51df4a0f55cdf9c649af886399488ddb/README.md#L1-L9",
+      "note": "Upstream names the phone, sweet codename, SM7150 and Snapdragon 732G; this is not an upstream adb-property transcript."
+    },
+    {
+      "subject": "Scope and variant caution",
+      "url": "https://github.com/dipa-studio/ios-sweet/blob/45263bee51df4a0f55cdf9c649af886399488ddb/README.md#L48-L56",
+      "note": "Upstream describes global or Indian sweet, but warns that other variants or firmware may need changes."
+    },
+    {
+      "subject": "Hardware-specific facts",
+      "url": "https://github.com/dipa-studio/ios-sweet/blob/45263bee51df4a0f55cdf9c649af886399488ddb/README.md#L190-L199",
+      "note": "References the memory, interrupt, panel, touch and button assumptions of the documented board."
+    },
+    {
+      "subject": "CPU architecture",
+      "url": "https://github.com/dipa-studio/ios-sweet/blob/45263bee51df4a0f55cdf9c649af886399488ddb/shim/start.S#L1-L4",
+      "note": "Upstream's target shim uses an arm64 Linux Image header; Android ABI property strings are not documented there."
+    }
+  ]
+}

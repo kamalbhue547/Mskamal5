@@ -1,0 +1,50 @@
+# Python / editor
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+.DS_Store
+*.swp
+
+# Private research, backups, device logs, and locally produced trees
+/backup/
+/backups/
+/dtb/
+/recovery/
+/research/
+/logs/
+/out/
+/build/
+/dist/
+*.log
+*.dump
+
+# Firmware, partition images, archives and generated binaries
+*.ipsw
+*.dmg
+*.img
+*.img.*
+*.simg
+*.bin
+*.elf
+*.o
+*.dtb
+*.dtbo
+*.adt
+*.im4p
+*.raw
+*.qcow2
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
+# Credentials and sensitive local configuration
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
