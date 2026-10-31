@@ -93,8 +93,11 @@ def _parse_profile(data: object, path: Path) -> Profile:
         url = _text(item.get("url"), "evidence.url", 2048)
         try:
             parts = urlparse(url)
+            # Accessing .port validates that a supplied port is numeric and in range.
+            _ = parts.port
             valid_url = (parts.scheme == "https" and bool(parts.hostname)
-                         and parts.username is None and parts.password is None)
+                         and parts.username is None and parts.password is None
+                         and not any(char.isspace() for char in url))
         except ValueError as exc:
             raise ProfileError("evidence URLs must be valid absolute HTTPS URLs without credentials") from exc
         if not valid_url:

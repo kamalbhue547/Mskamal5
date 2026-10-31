@@ -40,11 +40,19 @@ python3 -m devicecheck --help
 python3 -m compileall -q devicecheck tests
 ```
 
-The CI workflow runs these mocked tests on Linux across supported Python
-versions. No physical device, Apple firmware, sudo, or network is needed to run
-the tests. If you run a physical-device test separately, state exact consent,
-mode, non-sensitive firmware details, commands, observed outcomes and what was
-*not* tested; do not conflate mocks, emulation and hardware results.
+When this project is checked out inside the parent repository,
+`.github/workflows/python-package.yml` at the parent root runs the mocked tests
+and flake8 from `ios-sweet-portability/` across supported Python versions. The
+parent repository also provides `pytest.ini` so contributors with pytest
+installed can run `python3 -m pytest` from its root; pytest is optional and not
+needed for the documented unittest command. The workflow inside this project's
+own `.github/workflows/` is for when the project is published as a standalone
+repository. GitHub Actions does not discover that nested workflow in the parent
+repository. No physical device,
+Apple firmware, sudo, or network is needed to run the tests. If you run a
+physical-device test separately, state exact consent, mode, non-sensitive
+firmware details, commands, observed outcomes and what was *not* tested; do not
+conflate mocks, emulation and hardware results.
 
 Before submitting, inspect the changes and ensure no sensitive artifacts or
 unrelated files are included:

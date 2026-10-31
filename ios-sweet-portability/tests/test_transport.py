@@ -24,6 +24,62 @@ class TransportTests(unittest.TestCase):
     def test_parse_fastboot_devices(self):
         self.assertEqual(parse_fastboot_devices("SERIAL\tfastboot\n"), [Device("SERIAL", "fastboot")])
 
+    def test_unknown_adb_state_still_counts_for_device_selection(self):
+        output = "List of devices attached\nFIRST\tdevice\nSECOND\trescue\n"
+        with patch("devicecheck.transport._run", return_value=output) as runner:
+            with self.assertRaisesRegex(SelectionError, "multiple"):
+                discover("auto")
+        self.assertEqual(runner.call_count, 1)
+
+    def test_unknown_adb_state_does_not_trigger_fastboot_fallback(self):
+        with patch("devicecheck.transport._run", side_effect=["PRIVATE\tconnecting\n", "OTHER\tfastboot\n"]) as runner:
+            with self.assertRaises(SelectionError) as context:
+                discover("auto")
+        self.assertEqual(runner.call_count, 1)
+        self.assertNotIn("PRIVATE", str(context.exception))
+
+    def test_empty_adb_response_fails_closed_before_fastboot(self):
+        with patch("devicecheck.transport._run", side_effect=["", "OTHER\tfastboot\n"]) as runner:
+            with self.assertRaisesRegex(SelectionError, "adb.*device list"):
+                discover("auto")
+        self.assertEqual(runner.call_count, 1)
+
+    def test_valid_empty_adb_list_can_fall_back_to_fastboot(self):
+        with patch("devicecheck.transport._run", side_effect=["List of devices attached\n\n", "OTHER\tfastboot\n"]) as runner:
+            self.assertEqual(discover("auto").transport, "fastboot")
+        self.assertEqual(runner.call_count, 2)
+
+    def test_malformed_adb_list_fails_closed_before_fastboot(self):
+        with patch("devicecheck.transport._run", side_effect=["List of devices attached\nBROKEN\n", "OTHER\tfastboot\n"]) as runner:
+            with self.assertRaises(SelectionError) as context:
+                discover("auto")
+        self.assertEqual(runner.call_count, 1)
+        self.assertNotIn("BROKEN", str(context.exception))
+
+    def test_unknown_fastboot_state_still_counts_for_selection(self):
+        with patch("devicecheck.transport._run", return_value="FIRST\tfastboot\nSECOND\tunknown\n"):
+            with self.assertRaisesRegex(SelectionError, "multiple"):
+                discover("fastboot")
+
+    def test_malformed_fastboot_list_fails_closed(self):
+        with patch("devicecheck.transport._run", return_value="FIRST\tfastboot\nBROKEN\n"):
+            with self.assertRaisesRegex(SelectionError, "unrecognized device list") as context:
+                discover("fastboot")
+        self.assertNotIn("BROKEN", str(context.exception))
+
+    def test_explicit_selection_can_target_one_among_unrecognized_states(self):
+        with patch("devicecheck.transport._run", return_value="FIRST\tdevice\nSECOND\tnew-state\n"):
+            self.assertEqual(discover("adb", "FIRST").device.serial, "FIRST")
+            with self.assertRaisesRegex(SelectionError, "unrecognized device state"):
+                discover("adb", "SECOND")
+
+    def test_unrecognized_state_is_not_echoed(self):
+        with patch("devicecheck.transport._run", return_value="DEVICE\tsecret-serial-\x1b[31m\n"):
+            with self.assertRaises(SelectionError) as context:
+                discover("adb")
+        self.assertNotIn("secret-serial", str(context.exception))
+        self.assertNotIn("\x1b", str(context.exception))
+
     def test_adb_binary_missing(self):
         with patch("devicecheck.transport.shutil.which", return_value=None):
             with self.assertRaisesRegex(ToolError, "adb is not installed"):
@@ -70,6 +126,20 @@ class TransportTests(unittest.TestCase):
                 discover("adb")
             self.assertEqual(discover("adb", "TWO").device.serial, "TWO")
 
+    def test_duplicate_selected_identifier_fails_closed(self):
+        with patch("devicecheck.transport._run", return_value="PRIVATE\tdevice\nPRIVATE\toffline\n"):
+            with self.assertRaisesRegex(SelectionError, "duplicate") as context:
+                discover("adb", "PRIVATE")
+        self.assertNotIn("PRIVATE", str(context.exception))
+
+    def test_no_permissions_explains_usb_access_for_both_modes(self):
+        for mode in ("adb", "fastboot"):
+            with self.subTest(mode=mode):
+                with patch("devicecheck.transport._run", return_value="PRIVATE\tno permissions (udev rules)\n"):
+                    with self.assertRaisesRegex(SelectionError, "USB/udev permissions") as context:
+                        discover(mode)
+                self.assertNotIn("PRIVATE", str(context.exception))
+
     def test_unknown_serial_is_not_echoed(self):
         with patch("devicecheck.transport._run", return_value="ONE\tdevice\n"):
             with self.assertRaises(SelectionError) as context:
@@ -101,6 +171,18 @@ class TransportTests(unittest.TestCase):
                 discover("adb")
         self.assertIn("raw diagnostics suppressed", str(context.exception))
         self.assertNotIn("PRIVATE-SERIAL", str(context.exception))
+
+    def test_os_error_is_helpful_and_does_not_echo_details(self):
+        with patch("devicecheck.transport.shutil.which", return_value="/mock/adb"), \
+             patch("devicecheck.transport.subprocess.run", side_effect=PermissionError("PRIVATE-SERIAL")):
+            with self.assertRaises(ToolError) as context:
+                discover("adb")
+        self.assertIn("could not run adb", str(context.exception))
+        self.assertNotIn("PRIVATE-SERIAL", str(context.exception))
+
+    def test_invalid_transport_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "unsupported transport"):
+            discover("invalid")
 
     def test_runtime_allowlist_blocks_unsafe_commands_before_execution(self):
         commands = [

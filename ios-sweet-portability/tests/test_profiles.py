@@ -35,6 +35,28 @@ class ProfileTests(unittest.TestCase):
         with self.assertRaises(ProfileError):
             load_profiles(self.directory)
 
+    def test_missing_directory_fails_closed(self):
+        with self.assertRaisesRegex(ProfileError, "directory is unavailable"):
+            load_profiles(self.directory / "missing")
+
+    def test_invalid_object_types_fail_closed(self):
+        baseline = json.dumps(self.data)
+        for field, value, error in (("identity", None, "identity must"),
+                                    ("platform", "arm64", "platform must"),
+                                    ("evidence", [None], "each evidence")):
+            with self.subTest(field=field):
+                self.data = json.loads(baseline)
+                self.data[field] = value
+                self.write()
+                with self.assertRaisesRegex(ProfileError, error):
+                    load_profiles(self.directory)
+
+    def test_supported_profile_requires_a_soc_label_list(self):
+        self.data["identity"]["soc_labels"] = []
+        self.write()
+        with self.assertRaisesRegex(ProfileError, "identity.soc_labels"):
+            load_profiles(self.directory)
+
     def test_missing_evidence_fails_closed(self):
         self.data["evidence"] = []
         self.write()
@@ -48,12 +70,20 @@ class ProfileTests(unittest.TestCase):
             load_profiles(self.directory)
 
     def test_malformed_url_and_credentials_are_rejected(self):
-        for url in ("https://[", "https://user:password@example.test/source"):
+        for url in ("https://[", "https://user:password@example.test/source",
+                    "https://example.test:invalid/source", "https://example.test:99999/source",
+                    "https://example.test/unescaped space"):
             with self.subTest(url=url):
                 self.data["evidence"][0]["url"] = url
                 self.write()
                 with self.assertRaisesRegex(ProfileError, "HTTPS"):
                     load_profiles(self.directory)
+
+    def test_valid_encoded_evidence_url_is_accepted(self):
+        self.data["evidence"][0]["url"] = "https://example.test:443/path%20with%20spaces"
+        self.write()
+        self.assertEqual(load_profiles(self.directory)[0].evidence[0].url,
+                         "https://example.test:443/path%20with%20spaces")
 
     def test_wrong_filename_fails_closed(self):
         self.write("other.json")

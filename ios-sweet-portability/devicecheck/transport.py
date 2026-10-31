@@ -85,31 +85,40 @@ def _run(tool: str, args: list[str], operation: str) -> str:
     return result.stdout
 
 
-def parse_adb_devices(output: str) -> list[Device]:
+def _parse_devices(output: str, tool: str, states: set[str]) -> list[Device]:
     devices = []
     for line in output.splitlines():
         line = line.strip()
-        if not line or line.startswith("List of devices attached") or line.startswith("*"):
+        if not line or (tool == "adb" and (line.startswith("List of devices attached") or line.startswith("*"))):
             continue
         parts = line.split(None, 1)
         if len(parts) != 2:
-            continue
+            # Do not ignore an unparseable entry and silently select another
+            # device, including through auto's fallback to fastboot.
+            raise SelectionError(f"{tool} returned an unrecognized device list; check the tool and connection")
         serial, state = parts
-        if state in {"device", "offline", "unauthorized", "recovery", "sideload", "bootloader"} or state.startswith("no permissions"):
-            devices.append(Device(serial, state))
+        if state.startswith("no permissions"):
+            state = "no permissions"
+        elif state not in states:
+            # Device output is untrusted and may contain an identifier or
+            # terminal control sequence; never echo an unknown state verbatim.
+            state = "unrecognized"
+        devices.append(Device(serial, state))
+    return devices
+
+
+def parse_adb_devices(output: str) -> list[Device]:
+    states = {"device", "offline", "unauthorized", "recovery", "sideload",
+              "bootloader", "rescue", "authorizing", "connecting"}
+    devices = _parse_devices(output, "adb", states)
+    has_header = any(line.strip().startswith("List of devices attached") for line in output.splitlines())
+    if not devices and not has_header:
+        raise SelectionError("adb returned an incomplete device list; check the adb server and connection")
     return devices
 
 
 def parse_fastboot_devices(output: str) -> list[Device]:
-    devices = []
-    for line in output.splitlines():
-        parts = line.strip().split(None, 1)
-        if len(parts) != 2:
-            continue
-        serial, state = parts
-        if state in {"fastboot", "fastbootd"} or state.startswith("no permissions"):
-            devices.append(Device(serial, state))
-    return devices
+    return _parse_devices(output, "fastboot", {"fastboot", "fastbootd"})
 
 
 def _choose(devices: list[Device], serial: str | None, tool: str) -> Device | None:
@@ -131,10 +140,14 @@ def _choose(devices: list[Device], serial: str | None, tool: str) -> Device | No
         raise SelectionError("adb device is unauthorized; unlock the screen and approve the computer's USB debugging prompt")
     if device.state == "offline":
         raise SelectionError("adb device is offline; check the cable, USB debugging and connection, then retry")
-    if device.state.startswith("no permissions"):
+    if device.state == "no permissions":
         raise SelectionError(f"{tool} cannot access the USB device; check Linux USB/udev permissions")
+    if device.state == "unrecognized":
+        raise SelectionError(f"{tool} reported an unrecognized device state; check its mode and connection")
+    if tool == "adb" and device.state in {"authorizing", "connecting"}:
+        raise SelectionError("adb device is still connecting or awaiting authorization; approve USB debugging and retry")
     if tool == "adb" and device.state != "device":
-        raise SelectionError(f"adb device is in {device.state} mode; Android properties from recovery/sideload are not reliable. Start Android normally and retry")
+        raise SelectionError(f"adb device is in {device.state} mode; Android properties from non-Android modes are not reliable. Start Android normally and retry")
     return device
 
 
