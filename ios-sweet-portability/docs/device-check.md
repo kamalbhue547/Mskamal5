@@ -20,9 +20,11 @@ result does not make either operation safe.
   getvar`** in its phone workflow; the note gives no reason, so we do not
   speculate, and we avoid `getvar` for every device. [Source][fastboot-note].
 - In auto mode: try adb first; if no matching device or adb is unavailable,
-  try fastboot. An unauthorized, offline, ambiguous or recovery-mode adb
-  device is an error, not a reason to silently select a different device.
-  Auto stops after a successful adb selection; it does not also probe fastboot.
+  try fastboot. An unauthorized, offline, connecting, ambiguous or non-Android
+  adb device is an error, not a reason to silently select a different device.
+  Unrecognized device states still count toward selection; an unparseable
+  device list fails closed. Auto stops after a successful adb selection; it
+  does not also probe fastboot.
 
 The runner enforces this command allowlist before execution. Tools are invoked
 directly (no host shell) with an 8-second timeout per command. An adb server
@@ -89,11 +91,14 @@ of an evidence URL or a claimed hardware test. See [profile rules](../profiles/R
 | 2 | `incompatible`: mismatch with explicitly selected profile; argparse usage errors also use 2 |
 | 3 | tool, device-selection, connection or profile error |
 
-`--json` emits one JSON object, including `status`, the checked properties and
-unknowns; errors have `status: "error"`. Do not interpret a zero exit status as
-permission to flash. If tools are missing, install Platform Tools; if access is
-unauthorized, approve the debugging prompt; if offline or missing, check the
-cable, USB permissions and mode. The checker does not change device mode.
+For device checks, `--json` emits one JSON object, including `status`, the
+checked properties and unknowns; tool, device and profile errors have
+`status: "error"`. Argument-parser usage errors still produce ordinary argparse
+text on stderr and exit 2, even with `--json`; `--help` produces text. Do not
+interpret a zero exit status as permission to flash. If tools are missing,
+install Platform Tools; if access is unauthorized, approve the debugging
+prompt; if offline or missing, check the cable, USB permissions and mode. The
+checker does not change device mode.
 
 [fastboot-note]: https://github.com/dipa-studio/ios-sweet/blob/45263bee51df4a0f55cdf9c649af886399488ddb/NOTES.md#L39-L46
 [identity]: https://github.com/dipa-studio/ios-sweet/blob/45263bee51df4a0f55cdf9c649af886399488ddb/README.md#L1-L9

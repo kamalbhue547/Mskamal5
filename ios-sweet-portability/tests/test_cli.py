@@ -93,6 +93,16 @@ class CliTests(unittest.TestCase):
         self.assertNotIn(PRIVATE, out)
         self.assertIn("never to use fastboot getvar", report["warnings"][0])
 
+    def test_auto_fastboot_text_explains_missing_adb_and_redacts_serial(self):
+        code, out, err, commands = run_cli([], available=("fastboot",),
+                                           fastboot_devices=f"{PRIVATE}\tfastboot\n")
+        self.assertEqual((code, err), (1, ""))
+        self.assertIn("Result: UNKNOWN", out)
+        self.assertIn("adb is not installed", out)
+        self.assertIn("Only fastboot devices was run", out)
+        self.assertNotIn(PRIVATE, out)
+        self.assertEqual(commands, [["/mock/fastboot", "devices"]])
+
     def test_fastboot_reports_selected_profile_without_comparing_it(self):
         code, out, _, commands = run_cli(["--transport", "fastboot", "--profile", "sweet", "--json"],
                                           fastboot_devices=f"{PRIVATE}\tfastboot\n")
@@ -116,6 +126,15 @@ class CliTests(unittest.TestCase):
         self.assertEqual(json.loads(out)["status"], "error")
         self.assertEqual(commands, [])
 
+    def test_json_does_not_change_argparse_usage_errors(self):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            with self.assertRaises(SystemExit) as context:
+                main(["--json", "--transport", "invalid"])
+        self.assertEqual(context.exception.code, 2)
+        self.assertEqual(out.getvalue(), "")
+        self.assertIn("invalid choice", err.getvalue())
+
     def test_missing_executable_is_a_helpful_redacted_error(self):
         code, out, _, commands = run_cli(["--transport", "adb", "--json"], available=())
         self.assertEqual(code, 3)
@@ -126,6 +145,59 @@ class CliTests(unittest.TestCase):
         code, _, err, _ = run_cli(["--transport", "adb"], adb_devices="List of devices attached\n\n")
         self.assertEqual(code, 3)
         self.assertIn("no matching adb device", err)
+
+    def test_mock_fastboot_executable_end_to_end(self):
+        project = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as temp:
+            fake = Path(temp) / "fastboot"
+            fake.write_text(
+                f"#!{sys.executable}\n"
+                "import sys\n"
+                "if sys.argv[1:] == ['devices']:\n"
+                f"    print({PRIVATE!r} + '\\tfastboot')\n"
+                "else:\n"
+                "    sys.exit(99)\n", encoding="utf-8")
+            fake.chmod(0o755)
+            env = {**os.environ, "PATH": temp + os.pathsep + os.environ.get("PATH", "")}
+            run = subprocess.run([sys.executable, "-m", "devicecheck", "--transport", "fastboot",
+                                  "--profile", "sweet", "--json"],
+                                 cwd=project, env=env, text=True, capture_output=True, timeout=20)
+        report = json.loads(run.stdout)
+        self.assertEqual(run.returncode, 1, run.stderr)
+        self.assertEqual(report["status"], "unknown")
+        self.assertEqual(report["transport"], "fastboot")
+        self.assertEqual(report["profile"]["id"], "sweet")
+        self.assertNotIn(PRIVATE, run.stdout + run.stderr)
+
+    def test_mock_multiple_adb_states_do_not_fall_back_to_fastboot(self):
+        project = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as temp:
+            fake_adb = Path(temp) / "adb"
+            fake_adb.write_text(
+                f"#!{sys.executable}\n"
+                "import sys\n"
+                "if sys.argv[1:] == ['devices']:\n"
+                "    print('List of devices attached\\nFIRST\\tdevice\\nSECOND\\trescue')\n"
+                "else:\n"
+                "    sys.exit(99)\n", encoding="utf-8")
+            fake_adb.chmod(0o755)
+            marker = Path(temp) / "fastboot-was-called"
+            fake_fastboot = Path(temp) / "fastboot"
+            fake_fastboot.write_text(
+                f"#!{sys.executable}\n"
+                "from pathlib import Path\n"
+                f"Path({str(marker)!r}).write_text('called')\n"
+                "print('THIRD\\tfastboot')\n", encoding="utf-8")
+            fake_fastboot.chmod(0o755)
+            env = {**os.environ, "PATH": temp + os.pathsep + os.environ.get("PATH", "")}
+            run = subprocess.run([sys.executable, "-m", "devicecheck", "--json"],
+                                 cwd=project, env=env, text=True, capture_output=True, timeout=20)
+            self.assertFalse(marker.exists(), "auto must not fall back to another device")
+        self.assertEqual(run.returncode, 3, run.stderr)
+        self.assertEqual(json.loads(run.stdout)["status"], "error")
+        self.assertIn("multiple adb devices", json.loads(run.stdout)["error"])
+        self.assertNotIn("FIRST", run.stdout + run.stderr)
+        self.assertNotIn("SECOND", run.stdout + run.stderr)
 
     def test_mock_executable_end_to_end(self):
         # Exercise the actual CLI + subprocess boundary without any real phone.
