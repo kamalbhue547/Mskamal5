@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "replace-me",
+  "name": "REPLACE WITH EVIDENCE-BACKED NAME",
+  "support_level": "research_only",
+  "identity": {
+    "codename": null,
+    "manufacturer": null,
+    "model": null,
+    "soc_labels": []
+  },
+  "platform": {
+    "cpu_arch": null
+  },
+  "evidence": []
+}
