@@ -1,8 +1,9 @@
 import unittest
 from dataclasses import replace
+from typing import ClassVar
 
 from devicecheck.matching import adb_report, fastboot_report
-from devicecheck.profiles import load_profiles
+from devicecheck.profiles import Profile, load_profiles
 
 
 SWEET = {
@@ -15,6 +16,8 @@ SWEET = {
 
 
 class MatchTests(unittest.TestCase):
+    profiles: ClassVar[tuple[Profile, ...]]
+
     @classmethod
     def setUpClass(cls):
         cls.profiles = load_profiles()

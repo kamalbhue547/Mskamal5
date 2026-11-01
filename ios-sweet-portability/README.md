@@ -18,6 +18,7 @@ physical testing.
 > Read [safety and recovery](docs/safety-recovery.md) first.
 
 [Android phone](#quick-start-android-phone) · [Linux computer](#quick-start-linux) ·
+[Optional install](#optional-install-as-a-command) ·
 [More commands](#more-copy-and-paste-commands) · [Results](#understanding-the-result) ·
 [Troubleshooting](#troubleshooting) · [Research guides](#research-guides)
 
@@ -27,7 +28,7 @@ physical testing.
 | --- | --- |
 | Where to run | A Linux computer or, in local mode, an Android phone with Termux |
 | Python | 3.10 or newer; the CI matrix targets 3.10–3.14 |
-| Python packages | None required; the CLI and tests use the standard library |
+| Python packages | No runtime dependencies; optional installation uses pip and build tools |
 | Phone tools | Local Android `getprop`, or computer-side `adb`; `fastboot` is only for optional enumeration |
 | Reference profile | Redmi Note 10 Pro `sweet`; an identity comparison, not a flashing recommendation |
 | Safety | The checker sends no unlock, reboot, flash, erase, push, or write commands |
@@ -157,10 +158,46 @@ with the included reference profile. It does not install or change the device's
 software. See [what the result means](#understanding-the-result) before making
 any decision; no result authorizes flashing.
 
+## Optional: install as a command
+
+A source checkout already works from `ios-sweet-portability/` without pip. To
+install the command in a virtual environment, start at the **repository root**
+(the folder containing `pyproject.toml`); if you followed the Linux quick start
+above, run `cd ..` first. On Linux, run:
+
+```sh
+python3 -m venv .venv &&
+. .venv/bin/activate &&
+python -m pip install -e . &&
+devicecheck --version &&
+devicecheck --list-profiles
+```
+
+Pip may download the Python build backend. The installed CLI has no third-party
+runtime dependencies and includes the reviewed `sweet` profile as package data.
+The version and profile-listing commands do not connect to a device. The profile
+list describes references, not compatible or flash-safe devices.
+
+While the environment is active, both `devicecheck` and `python -m devicecheck`
+work from the repository root or another directory. From the repository root,
+`python -m unittest discover -q` runs the mocked tests. Installation is into
+the selected Python environment; it does not unlock, flash, or erase a phone.
+
 ## More copy-and-paste commands
 
 Run these from `ios-sweet-portability/`. Choose the command that matches your
-situation; a phone is needed except for help and tests.
+situation; a phone is needed except for help, profile listing, and tests.
+
+### Inspect the version and bundled profiles without a phone
+
+```sh
+python3 -m devicecheck --version &&
+python3 -m devicecheck --list-profiles --json
+```
+
+The JSON list contains profile IDs, names, and evidence levels. It is not a
+list of devices proven compatible with iOS. `--list-profiles` is an offline
+operation and cannot be combined with device-selection or property options.
 
 ### Check the phone running Termux
 
@@ -260,8 +297,8 @@ Read the exact rules and privacy details in [the device-check guide](docs/device
 ## Troubleshooting
 
 - **`No module named devicecheck`:** enter the `ios-sweet-portability/` folder
-  first, then rerun the command. If you are at the repository root, copy
-  `cd ios-sweet-portability`.
+  first, or activate the virtual environment in which you installed the package.
+  From the repository root, `cd ios-sweet-portability` works without installation.
 - **Python is older than 3.10:** install a newer Python interpreter and use it
   instead of the older `python3` in the examples.
 - **`adb` or `fastboot` is not installed:** install Platform Tools for your
@@ -286,7 +323,7 @@ Read the exact rules and privacy details in [the device-check guide](docs/device
 
 ## Scope and evidence
 
-This project includes a sourced [`sweet` reference profile](profiles/sweet.json),
+This project includes a sourced [`sweet` reference profile](devicecheck/profile_data/sweet.json),
 strict matching, text/JSON reports with raw tool diagnostics suppressed, mocked
 tests, and a framework for evidence-backed research profiles. A profile cannot
 create drivers, a boot chain, a recovery plan, or a working port; no additional

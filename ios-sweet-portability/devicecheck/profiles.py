@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from importlib.resources import files
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -33,7 +34,9 @@ class Profile:
     evidence: tuple[Evidence, ...]
 
 
-PROFILE_DIR = Path(__file__).resolve().parent.parent / "profiles"
+# The checked-in profile is also packaged here in installed wheels. Normal
+# loading uses importlib.resources, which works even for a zip import.
+PROFILE_DIR = Path(__file__).resolve().parent / "profile_data"
 LEVELS = {"upstream_reference", "hardware_verified", "research_only"}
 ID_PATTERN = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}\Z")
 
@@ -60,6 +63,7 @@ def _parse_profile(data: object, path: Path) -> Profile:
     identity = data.get("identity")
     if not isinstance(identity, dict):
         raise ProfileError("identity must be an object")
+
     def identity_text(key: str) -> str | None:
         value = identity.get(key)
         if value is None and level == "research_only":
@@ -107,24 +111,37 @@ def _parse_profile(data: object, path: Path) -> Profile:
     return Profile(profile_id, name, level, codename, manufacturer, model, soc_labels, cpu_arch, tuple(evidence))
 
 
-def load_profiles(directory: Path = PROFILE_DIR) -> tuple[Profile, ...]:
-    """Fail closed on missing, malformed, duplicate or unreviewed-as-data files.
+def load_profiles(directory: Path | None = None) -> tuple[Profile, ...]:
+    """Load bundled profiles or an explicit directory, failing closed.
 
     Schema validation cannot establish that a source is truthful or that a port
     exists. Human review of the evidence and physical tests are still required.
     """
-    if not directory.is_dir():
-        raise ProfileError(f"profile directory is unavailable: {directory}")
-    paths = sorted(directory.glob("*.json"))
+    try:
+        source = (
+            directory if directory is not None
+            else files("devicecheck.profile_data")
+        )
+        if not source.is_dir():
+            raise ProfileError(f"profile directory is unavailable: {source}")
+        paths = sorted(
+            (path for path in source.iterdir() if path.name.endswith(".json")),
+            key=lambda path: path.name,
+        )
+    except (ImportError, OSError) as exc:
+        raise ProfileError("profile directory is unavailable") from exc
     if not paths:
-        raise ProfileError(f"no device profiles found in {directory}")
+        raise ProfileError(f"no device profiles found in {source}")
     profiles = []
     for path in paths:
         try:
-            with path.open(encoding="utf-8") as stream:
+            with path.open("r", encoding="utf-8") as stream:
                 data = json.load(stream)
-            profiles.append(_parse_profile(data, path))
-        except (OSError, UnicodeError, json.JSONDecodeError, ProfileError) as exc:
+            # A packaged resource can be a zip path, not a filesystem Path.
+            profiles.append(_parse_profile(data, Path(path.name)))
+        except (
+            OSError, UnicodeError, json.JSONDecodeError, ProfileError
+        ) as exc:
             raise ProfileError(f"invalid profile {path.name}: {exc}") from exc
     if len({p.id for p in profiles}) != len(profiles):
         raise ProfileError("duplicate profile ids")

@@ -9,7 +9,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from devicecheck import __version__
 from devicecheck.__main__ import main
+from devicecheck.profiles import ProfileError
 from devicecheck.transport import ADB_PROPERTIES
 
 
@@ -55,6 +57,61 @@ def run_cli(args, adb_devices=None, fastboot_devices=None, values=None, availabl
 
 
 class CliTests(unittest.TestCase):
+    def test_version_requires_neither_profiles_nor_device_tools(self):
+        out = io.StringIO()
+        with patch("devicecheck.__main__.load_profiles") as profiles, \
+             patch("devicecheck.__main__.discover") as discover, \
+             contextlib.redirect_stdout(out):
+            with self.assertRaises(SystemExit) as context:
+                main(["--version"])
+        self.assertEqual(context.exception.code, 0)
+        self.assertEqual(out.getvalue().strip(), f"devicecheck {__version__}")
+        profiles.assert_not_called()
+        discover.assert_not_called()
+
+    def test_list_profiles_is_offline_in_text_and_json(self):
+        for args in (["--list-profiles"], ["--list-profiles", "--json"]):
+            with self.subTest(args=args):
+                code, out, err, commands = run_cli(args)
+                self.assertEqual((code, err, commands), (0, "", []))
+                if "--json" in args:
+                    by_id = {
+                        profile["id"]: profile
+                        for profile in json.loads(out)["profiles"]
+                    }
+                    self.assertEqual(
+                        by_id["sweet"]["support_level"], "upstream_reference"
+                    )
+                else:
+                    self.assertIn(
+                        "sweet: Xiaomi Redmi Note 10 Pro (upstream_reference)",
+                        out,
+                    )
+
+    def test_list_profiles_reports_invalid_data_without_device_access(self):
+        error = ProfileError("invalid profile")
+        with patch("devicecheck.__main__.load_profiles", side_effect=error):
+            code, out, err, commands = run_cli(["--list-profiles", "--json"])
+        self.assertEqual((code, err, commands), (3, "", []))
+        self.assertEqual(
+            json.loads(out), {"status": "error", "error": "invalid profile"}
+        )
+
+    def test_list_profiles_rejects_device_only_options_before_loading(self):
+        for extra in (["--transport", "local"], ["--profile", "sweet"],
+                      ["--serial", PRIVATE], ["--show-properties"]):
+            with self.subTest(extra=extra):
+                out, err = io.StringIO(), io.StringIO()
+                with patch("devicecheck.__main__.load_profiles") as profiles, \
+                     contextlib.redirect_stdout(out), \
+                     contextlib.redirect_stderr(err):
+                    with self.assertRaises(SystemExit) as context:
+                        main(["--list-profiles", *extra])
+                self.assertEqual(context.exception.code, 2)
+                self.assertEqual(out.getvalue(), "")
+                self.assertNotIn(PRIVATE, err.getvalue())
+                profiles.assert_not_called()
+
     def test_full_adb_cli_supported_is_redacted_and_read_only(self):
         code, out, err, commands = run_cli(["--transport", "adb"])
         self.assertEqual((code, err), (0, ""))

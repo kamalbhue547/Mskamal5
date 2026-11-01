@@ -18,13 +18,29 @@ class ProfileTests(unittest.TestCase):
 
     def test_checked_in_profile_is_a_sourced_reference(self):
         profiles = load_profiles()
-        self.assertEqual([p.id for p in profiles], ["sweet"])
-        p = profiles[0]
+        by_id = {profile.id: profile for profile in profiles}
+        self.assertIn("sweet", by_id)
+        p = by_id["sweet"]
         self.assertEqual(p.support_level, "upstream_reference")
         self.assertEqual((p.codename, p.manufacturer, p.model), ("sweet", "Xiaomi", "Redmi Note 10 Pro"))
         self.assertEqual(p.soc_labels, ("SM7150", "Snapdragon 732G"))
         self.assertEqual(p.cpu_arch, "arm64")
         self.assertTrue(all("45263bee51df4a0f55cdf9c649af886399488ddb" in e.url for e in p.evidence))
+
+    def test_multiple_profiles_can_be_loaded_without_a_fixed_count_or_order(self):
+        self.write()
+        self.data["id"] = "alpha"
+        self.data["name"] = "Synthetic research profile"
+        self.data["support_level"] = "research_only"
+        self.data["identity"] = {
+            "codename": None, "manufacturer": None, "model": None,
+            "soc_labels": [],
+        }
+        self.write("alpha.json")
+        by_id = {profile.id: profile for profile in load_profiles(self.directory)}
+        self.assertEqual(set(by_id), {"alpha", "sweet"})
+        self.assertEqual(by_id["sweet"].codename, "sweet")
+        self.assertEqual(by_id["alpha"].support_level, "research_only")
 
     def test_empty_directory_fails_closed(self):
         with self.assertRaisesRegex(ProfileError, "no device profiles"):
