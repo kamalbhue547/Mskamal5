@@ -247,8 +247,8 @@ def read_local_properties() -> LocalProperties:
     hard errors. Unlike local mode, adb stays fail-fast because a failure can
     indicate that the selected device disconnected during the comparison.
     """
-    values = {}
-    failed = []
+    values: dict[str, str | None] = {}
+    failed: list[str] = []
     for key in ADB_PROPERTIES:
         try:
             output = _run("getprop", [key], f"reading {key}")

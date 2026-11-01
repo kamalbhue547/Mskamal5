@@ -1,0 +1,8 @@
+include LICENSE README.md pytest.ini test_repository.py
+include ios-sweet-portability/LICENSE
+include ios-sweet-portability/CONTRIBUTING.md
+include ios-sweet-portability/THIRD_PARTY_NOTICES.md
+recursive-include ios-sweet-portability/docs *.md
+recursive-include ios-sweet-portability/profiles *.md *.json.example
+recursive-include ios-sweet-portability/tests *.py
+recursive-include ios-sweet-portability/devicecheck/profile_data *.json

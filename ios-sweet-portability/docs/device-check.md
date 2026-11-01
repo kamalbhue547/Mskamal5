@@ -51,6 +51,20 @@ missing, not a command failure. In adb mode any property-command failure
 remains a hard error: a disconnected or unauthorized device must not yield a
 partial match from earlier reads.
 
+## Offline package information
+
+`python3 -m devicecheck --version` shows the package version and exits without
+loading a profile or contacting a device. `--list-profiles` validates and lists
+bundled profile IDs, display names, and support levels without running adb,
+fastboot, or getprop. With `--json`, it emits a `profiles` array in a JSON
+object. Profile names are evidence references, not a list of devices proven
+compatible or safe to flash. Listing cannot be combined with `--transport`,
+`--profile`, `--serial`, or `--show-properties`; `--json` is supported.
+
+The bundled profile data is loaded via Python package resources from
+`devicecheck/profile_data/` and included in the installed wheel. An unavailable
+or invalid profile fails closed; no device command is attempted.
+
 ## Selection and privacy
 
 For adb/fastboot, exactly one device needs no serial argument. Multiple devices
@@ -124,7 +138,7 @@ of an evidence URL or a claimed hardware test. See [profile rules](../profiles/R
 
 | Code | Meaning |
 | --- | --- |
-| 0 | `supported`: reference identity match only |
+| 0 | `supported`: reference identity match only; also successful help, version or offline profile listing |
 | 1 | `unknown`: not enough evidence, a partial local read, or fastboot enumeration only |
 | 2 | `incompatible`: mismatch with explicitly selected profile; argparse usage errors also use 2 |
 | 3 | tool, device-selection, connection or profile error |

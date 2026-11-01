@@ -1,0 +1,62 @@
+# Python environments, caches, coverage, and packaging output
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.venv/
+venv/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.egg-info/
+build/
+dist/
+*.whl
+
+# Editors and operating systems
+.DS_Store
+*.swp
+
+# Private research and device output; review staged files before sharing
+/backup/
+/backups/
+/dtb/
+/recovery/
+/research/
+/logs/
+/out/
+*.log
+*.dump
+
+# Firmware, partition backups, generated images, and archives
+*.ipsw
+*.dmg
+*.img
+*.img.*
+*.simg
+*.bin
+*.elf
+*.o
+*.dtb
+*.dtbo
+*.adt
+*.im4p
+*.raw
+*.qcow2
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
+# Credentials and sensitive local configuration
+.env
+.env.*
+*.env
+*.key
+*.pem
+*.p12
+*.pfx

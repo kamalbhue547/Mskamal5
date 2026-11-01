@@ -15,7 +15,9 @@ substitute for reviewing files and Git history before publication.
    vendor claims, source observations, hardware measurements and hypotheses;
    list contradictions and unknowns. Redact any identifying details.
 2. Start a `research_only` profile using the documented schema and a real
-   evidence link. Nulls and an empty SoC label list are allowed when unknown.
+   evidence link. Bundled JSON profiles live in `devicecheck/profile_data/`;
+   the example template and field rules are in `profiles/`. Nulls and an empty
+   SoC label list are allowed when unknown.
    Add a sourced research note covering bootloader, DT, storage, display,
    input, kernel, security and recovery. The [porting guide](docs/porting.md)
    describes the engineering gates. A profile cannot implement a port.
@@ -42,15 +44,33 @@ python3 -m devicecheck --help
 python3 -m compileall -q devicecheck tests
 ```
 
-When this project is checked out inside the parent repository,
-`.github/workflows/python-package.yml` at the parent root runs the mocked tests
-and flake8 from `ios-sweet-portability/` across supported Python versions. The
-parent repository also provides `pytest.ini` so contributors with pytest
-installed can run `python3 -m pytest` from its root; pytest is optional and not
-needed for the documented unittest command. The workflow inside this project's
-own `.github/workflows/` is for when the project is published as a standalone
-repository. GitHub Actions does not discover that nested workflow in the parent
-repository. No physical device,
+When this project is checked out inside the parent repository, these commands
+also work from the parent root (the first needs no package installation):
+
+```sh
+python3 -m unittest discover -v
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e . mypy==1.20.2 flake8
+python -m devicecheck --help
+python -m mypy --check-untyped-defs ios-sweet-portability/devicecheck ios-sweet-portability/tests test_repository.py
+python -m flake8 ios-sweet-portability/devicecheck ios-sweet-portability/tests test_repository.py --select=E9,F63,F7,F82
+```
+
+Installation can download build or development tools. The CLI itself has no
+third-party runtime dependencies. Before changing package data, also build a
+wheel and install it into a separate clean environment outside the checkout;
+check that `devicecheck --list-profiles` finds `sweet` there. The bundled JSON
+and `py.typed` marker must be included in the wheel. Never include firmware or
+private data as package resources.
+
+The parent's `.github/workflows/python-package.yml` runs root and direct-project
+unittest discovery, selected flake8 checks, mypy with untyped bodies checked,
+and an sdist-to-installed-wheel smoke test across supported Python versions.
+The parent also provides `pytest.ini`; pytest is optional. The workflow inside this
+project's own `.github/workflows/` is for when the project is published as a
+standalone repository. GitHub Actions does not discover that nested workflow in
+the parent repository. No physical device,
 Apple firmware, sudo, or network is needed to run the tests. If you run a
 physical-device test separately, state exact consent, mode, non-sensitive
 firmware details, commands, observed outcomes and what was *not* tested; do not

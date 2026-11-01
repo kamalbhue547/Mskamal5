@@ -30,5 +30,20 @@ python3 -m devicecheck --help
 ```
 
 These commands download the project, run its mocked tests, and show the CLI
-help. They do not need a phone. For package installation, connecting a device,
-more commands, and explanations, see the [step-by-step guide](ios-sweet-portability/README.md#quick-start-linux).
+help. They do not need a phone.
+
+To install the `devicecheck` command in a virtual environment, start from the
+repository root (`cd ..` if you just ran the commands above):
+
+```sh
+python3 -m venv .venv &&
+. .venv/bin/activate &&
+python -m pip install -e . &&
+devicecheck --version &&
+devicecheck --list-profiles &&
+python -m unittest discover -q
+```
+
+The CLI has no third-party runtime dependencies; installation may download
+Python build tools. For connecting a device, more commands, and limitations,
+see the [step-by-step guide](ios-sweet-portability/README.md#quick-start-linux).

@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ios-sweet-devicecheck"
+dynamic = ["version"]
+description = "Read-only Android identity comparisons for ios-sweet portability research"
+readme = "ios-sweet-portability/README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE", "ios-sweet-portability/THIRD_PARTY_NOTICES.md"]
+authors = [{name = "kamalbhue547"}]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/kamalbhue547/Mskamal5"
+Issues = "https://github.com/kamalbhue547/Mskamal5/issues"
+
+[project.scripts]
+devicecheck = "devicecheck.__main__:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "devicecheck.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["ios-sweet-portability"]
+include = ["devicecheck*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+devicecheck = ["py.typed"]
+"devicecheck.profile_data" = ["*.json"]

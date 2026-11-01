@@ -7,7 +7,7 @@ review and device-specific engineering/testing remain necessary.
 
 ## `sweet`: documented upstream reference
 
-[`sweet.json`](sweet.json) records only identity labels stated by the pinned
+[`sweet.json`](../devicecheck/profile_data/sweet.json) records only identity labels stated by the pinned
 upstream: Xiaomi Redmi Note 10 Pro, `sweet`, Qualcomm SM7150 / Snapdragon 732G.
 Upstream describes global or Indian sweet and warns firmware/variants may need
 changes; the profile does not invent an extra Indian codename or claim all
@@ -27,8 +27,10 @@ identity match is not proof of actual hardware or safety. An unavailable
 
 ## Schema version 1
 
-- A profile lives in one `profiles/<id>.json`; lowercase `id` must match the
-  filename. `schema_version` is integer `1`, `name` is a display name.
+- A bundled profile lives in `devicecheck/profile_data/<id>.json` relative to
+  the project root; lowercase `id` must match the filename. The loader reads
+  these files as package resources so they also work in an installed wheel.
+  `schema_version` is integer `1`, `name` is a display name.
 - `support_level` is `research_only`, `upstream_reference`, or
   `hardware_verified`. `research_only` **never** produces `supported`.
 - `identity` contains `codename`, `manufacturer`, `model`, and `soc_labels`.

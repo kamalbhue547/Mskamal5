@@ -6,6 +6,7 @@ import argparse
 import json
 import sys
 
+from . import __version__
 from .matching import adb_report, fastboot_report
 from .profiles import ProfileError, load_profiles
 from .transport import (
@@ -26,15 +27,43 @@ RESULT_LABEL = {
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(
         prog="python3 -m devicecheck",
-        description="Read-only identity comparison; no unlock, reboot, flash, erase or installation.",
+        description=(
+            "Read-only identity comparison; "
+            "no unlock, reboot, flash, erase or installation."
+        ),
     )
-    result.add_argument("--transport", choices=("auto", "adb", "fastboot", "local"), default="auto",
-                        help="auto prefers adb (default); local reads this phone; fastboot only enumerates devices")
-    result.add_argument("--profile", help="compare against a specific profile ID, such as sweet")
-    result.add_argument("--serial", help="select one adb/fastboot device; not used in local mode; do not publish it")
-    result.add_argument("--json", action="store_true", help="emit JSON; review it for identifying details before sharing")
-    result.add_argument("--show-properties", action="store_true",
-                        help="show reported property values locally; they may identify the device")
+    result.add_argument(
+        "--version", action="version", version=f"devicecheck {__version__}"
+    )
+    mode = result.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--transport", choices=("auto", "adb", "fastboot", "local"),
+        default="auto",
+        help=("auto prefers adb (default); local reads this phone; "
+              "fastboot only enumerates devices"),
+    )
+    mode.add_argument(
+        "--list-profiles", action="store_true",
+        help="list bundled reference profiles without connecting to a device",
+    )
+    result.add_argument(
+        "--profile",
+        help="compare against a specific profile ID, such as sweet",
+    )
+    result.add_argument(
+        "--serial",
+        help=("select one adb/fastboot device; not used in local mode; "
+              "do not publish it"),
+    )
+    result.add_argument(
+        "--json", action="store_true",
+        help="emit JSON; review it for identifying details before sharing",
+    )
+    result.add_argument(
+        "--show-properties", action="store_true",
+        help=("show reported property values locally; "
+              "they may identify the device"),
+    )
     return result
 
 
@@ -95,12 +124,40 @@ def _print_report(report: dict) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = parser().parse_args(argv)
+    argument_parser = parser()
+    args = argument_parser.parse_args(argv)
+    if args.list_profiles and (
+        args.profile is not None or args.serial is not None
+        or args.show_properties
+    ):
+        argument_parser.error(
+            "--list-profiles cannot be combined with --profile, --serial, "
+            "or --show-properties"
+        )
     try:
         profiles = load_profiles()
+        if args.list_profiles:
+            entries = [
+                {"id": p.id, "name": p.name, "support_level": p.support_level}
+                for p in profiles
+            ]
+            if args.json:
+                print(json.dumps(
+                    {"profiles": entries}, indent=2, ensure_ascii=True
+                ))
+            else:
+                for entry in entries:
+                    print(
+                        f"{entry['id']}: {entry['name']} "
+                        f"({entry['support_level']})"
+                    )
+            return 0
         selected = next((p for p in profiles if p.id == args.profile), None)
         if args.profile is not None and selected is None:
-            raise ProfileError("requested profile is not available; inspect profiles/ for reviewed IDs")
+            raise ProfileError(
+                "requested profile is not available; "
+                "use --list-profiles to view reviewed IDs"
+            )
         if args.transport == "local":
             if args.serial is not None:
                 raise SelectionError("--serial is for adb/fastboot selection and cannot be used with local mode")
