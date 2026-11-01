@@ -2,9 +2,11 @@
 
 The checker is a **read-only identity comparison**, not a compatibility
 validator. It sends no unlock, reboot, flash, erase, push, arbitrary shell or
-filesystem-writing commands. It never installs iOS. Upstream's separate root
-flash erases Android `userdata`; unlocking may erase data. Even a `supported`
-result does not make either operation safe.
+filesystem-writing commands. Termux setup and Python's ordinary cache files may
+write to the app's own storage; the checker does not write directly to device
+partitions. It never installs iOS. Upstream's separate root flash erases Android
+`userdata`; unlocking may erase data. Even a `supported` result does not make
+either operation safe.
 
 ## Exact operations
 
@@ -15,6 +17,11 @@ result does not make either operation safe.
   version, and boot-state properties. Each property is queried separately, not
   by collecting the full property dump. Boot-state values are unverified
   software reports, **not** an authoritative unlock or AVB assessment.
+- In local mode on Android: `/system/bin/getprop <allowlisted-property>` for
+  each of the same 13 keys. No adb, fastboot, USB debugging, root, full
+  property dump, or serial query is used. Some vendors may restrict access or
+  omit properties. Android's source describes `getprop` as reading a named
+  property [here][getprop]. See the [phone setup guide](android-phone.md).
 - In fastboot mode: `fastboot devices` only. Product, chipset, unlock state and
   partition data remain unknown. Upstream explicitly says **never `fastboot
   getvar`** in its phone workflow; the note gives no reason, so we do not
@@ -24,7 +31,8 @@ result does not make either operation safe.
   adb device is an error, not a reason to silently select a different device.
   Unrecognized device states still count toward selection; an unparseable
   device list fails closed. Auto stops after a successful adb selection; it
-  does not also probe fastboot.
+  does not also probe fastboot. Auto does not select local mode; use
+  `--transport local` explicitly on the phone.
 
 The runner enforces this command allowlist before execution. Tools are invoked
 directly (no host shell) with an 8-second timeout per command. An adb server
@@ -35,14 +43,19 @@ commands still cannot guarantee that every vendor's software behaves correctly.
 
 ## Selection and privacy
 
-With exactly one device, no serial argument is needed. Multiple devices cause an
-error; disconnect extras or use `--serial <value>` locally. A serial is used
-internally to target a device, never printed by this tool or included in JSON;
-raw adb/fastboot stderr is suppressed because it can contain identifiers. The
-value can still be visible to the host OS or in a process list. Do not put a
-serial in an issue, log, test fixture or shell history you intend to publish.
-Review every report: ordinary model, board or custom property values can also be
-identifying. `--json` is redacted, **not an anonymity guarantee**.
+For adb/fastboot, exactly one device needs no serial argument. Multiple devices
+cause an error; disconnect extras or use `--serial <value>` locally. A serial is
+used internally to target a device and is not printed by this tool or included
+in JSON; values containing the selected adb serial are suppressed. The value can
+still be visible to the host OS or in a process list. Do not put a serial in an
+issue, log, test fixture or shell history you intend to publish.
+
+On-phone local mode does not query a hardware serial and rejects `--serial`.
+Because it does not know the serial, it **cannot recognize or redact one** if a
+custom property happens to contain it. Raw tool diagnostics are suppressed in
+all modes, but ordinary model, board or custom property values can still be
+identifying. Review and redact every report before sharing; JSON is **not an
+anonymity guarantee**.
 
 ## Matching rules
 
@@ -103,3 +116,4 @@ checker does not change device mode.
 [fastboot-note]: https://github.com/dipa-studio/ios-sweet/blob/45263bee51df4a0f55cdf9c649af886399488ddb/NOTES.md#L39-L46
 [identity]: https://github.com/dipa-studio/ios-sweet/blob/45263bee51df4a0f55cdf9c649af886399488ddb/README.md#L1-L9
 [arm64]: https://github.com/dipa-studio/ios-sweet/blob/45263bee51df4a0f55cdf9c649af886399488ddb/shim/start.S#L1-L4
+[getprop]: https://github.com/aosp-mirror/platform_system_core/blob/a3b721a32242006b59cb12bd62c9133632af3a2d/toolbox/getprop.cpp#L74-L78

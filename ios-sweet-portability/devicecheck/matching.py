@@ -74,8 +74,10 @@ def fastboot_report(warnings: tuple[str, ...] = (), profile: Profile | None = No
 
 
 def adb_report(values: dict[str, str | None], profiles: tuple[Profile, ...],
-               selected_id: str | None = None, warnings: tuple[str, ...] = ()) -> dict:
-    report = _base("adb", values, warnings)
+               selected_id: str | None = None, warnings: tuple[str, ...] = (),
+               *, transport: str = "adb") -> dict:
+    """Compare reported Android properties from adb or local on-phone mode."""
+    report = _base(transport, values, warnings)
     device = values.get("ro.product.device")
     build = values.get("ro.build.product")
     if selected_id is not None:

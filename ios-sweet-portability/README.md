@@ -17,26 +17,56 @@ physical testing.
 > flash a `sweet` image to an unverified device, even one with the same chipset.
 > Read [safety and recovery](docs/safety-recovery.md) first.
 
-[Quick start](#quick-start-linux) · [More commands](#more-copy-and-paste-commands) ·
-[Results](#understanding-the-result) · [Troubleshooting](#troubleshooting) ·
-[Research guides](#research-guides)
+[Android phone](#quick-start-android-phone) · [Linux computer](#quick-start-linux) ·
+[More commands](#more-copy-and-paste-commands) · [Results](#understanding-the-result) ·
+[Troubleshooting](#troubleshooting) · [Research guides](#research-guides)
 
 ## At a glance
 
 | Topic | Details |
 | --- | --- |
-| Where to run | A Linux computer, not the phone |
-| Python | 3.10 or newer; CI covers 3.10–3.13 |
+| Where to run | A Linux computer or, in local mode, an Android phone with Termux |
+| Python | 3.10 or newer; the CI matrix targets 3.10–3.14 |
 | Python packages | None required; the CLI and tests use the standard library |
-| Phone tools | Android Debug Bridge (`adb`) for Android mode; `fastboot` only for optional enumeration |
+| Phone tools | Local Android `getprop`, or computer-side `adb`; `fastboot` is only for optional enumeration |
 | Reference profile | Redmi Note 10 Pro `sweet`; an identity comparison, not a flashing recommendation |
 | Safety | The checker sends no unlock, reboot, flash, erase, push, or write commands |
 
-The tool selects one device and reads a short allowlist of Android properties.
-In fastboot mode it only lists devices; it does **not** use `fastboot getvar`,
-because the upstream phone workflow explicitly says not to. An `adb` server
-may start on the computer and an authorization prompt may appear on the phone.
-The reports omit the selected serial, but can still contain identifying details.
+On a computer, the tool selects one device and reads a short allowlist of
+Android properties. On the phone, local mode reads the same keys using Android's
+`getprop`. In fastboot mode it only lists devices; it does **not** use `fastboot
+getvar`, because the upstream phone workflow explicitly says not to. An `adb`
+server may start on the computer and an authorization prompt may appear on the
+phone. The selected adb serial is omitted from reports; local mode does not
+query one. In either mode, custom property values can still identify a device,
+so review all output before sharing it.
+
+## Quick start (Android phone)
+
+This runs the **checker**, not iOS, on a compatible Android phone. Install
+Termux from its [official installation instructions](https://github.com/termux/termux-app#installation).
+No computer, root, USB debugging, or Apple firmware is needed. Termux and local
+property access may not work on every phone; this mode has not been tested on a
+physical Android device.
+
+For a first-time checkout, open Termux and copy and paste:
+
+```sh
+pkg update &&
+pkg install -y git python &&
+cd "$HOME" &&
+git clone https://github.com/kamalbhue547/Mskamal5.git &&
+cd Mskamal5/ios-sweet-portability &&
+python3 -m devicecheck --transport local
+```
+
+**Why:** the first commands install Git and Python in Termux, Git downloads the
+project, and `local` checks this phone's reported identity without adb. Package
+installation and Python caches use Termux's app storage; the checker does not
+flash or erase partitions. If the folder already exists, or for tests, privacy,
+troubleshooting and detailed explanations, use the
+[step-by-step Android guide](docs/android-phone.md). An `unknown` result is
+normal for many devices and **no result authorizes flashing**.
 
 ## Quick start (Linux)
 
@@ -130,6 +160,17 @@ any decision; no result authorizes flashing.
 Run these from `ios-sweet-portability/`. Choose the command that matches your
 situation; a phone is needed except for help and tests.
 
+### Check the phone running Termux
+
+```sh
+python3 -m devicecheck --transport local --json
+```
+
+**Why:** this reads allowlisted properties from the phone itself and outputs
+JSON. It does not query a serial, but a custom property may still contain one;
+review and redact all output before sharing. See the
+[Android phone guide](docs/android-phone.md) for setup and limitations.
+
 ### Compare against the `sweet` reference
 
 ```sh
@@ -208,7 +249,10 @@ Read the exact rules and privacy details in [the device-check guide](docs/device
   instead of the older `python3` in the examples.
 - **`adb` or `fastboot` is not installed:** install Platform Tools for your
   Linux distribution and ensure the relevant executable is on `PATH`. The
-  test suite itself does not require either tool.
+  test suite and Android local mode do not require either tool.
+- **Local mode cannot run `getprop`:** run it on Android in Termux and check
+  device restrictions; some vendors may block access. Do not root the phone to
+  bypass this. See the [Android phone guide](docs/android-phone.md).
 - **ADB is unauthorized, offline, or finds no device:** start Android normally,
   unlock the screen, enable USB debugging, approve the computer's prompt, and
   try a data-capable cable or another USB port. Check Linux USB/udev permissions
@@ -226,10 +270,10 @@ Read the exact rules and privacy details in [the device-check guide](docs/device
 ## Scope and evidence
 
 This project includes a sourced [`sweet` reference profile](profiles/sweet.json),
-strict matching, redacted text/JSON reports, mocked tests, and a framework for
-evidence-backed research profiles. A profile cannot create drivers, a boot
-chain, a recovery plan, or a working port; no additional device is claimed
-supported.
+strict matching, text/JSON reports with raw tool diagnostics suppressed, mocked
+tests, and a framework for evidence-backed research profiles. A profile cannot
+create drivers, a boot chain, a recovery plan, or a working port; no additional
+device is claimed supported.
 
 The reference was inspected at upstream commit
 [`45263bee51df4a0f55cdf9c649af886399488ddb`](https://github.com/dipa-studio/ios-sweet/commit/45263bee51df4a0f55cdf9c649af886399488ddb)
@@ -240,6 +284,7 @@ installation test has been performed for this project.
 
 ## Research guides
 
+- [Run the checker on an Android phone with Termux](docs/android-phone.md)
 - [Device checker: commands, matching and privacy](docs/device-check.md)
 - [Architecture: boot chain, hardware and iOS root](docs/architecture.md)
 - [Porting a different device](docs/porting.md)
