@@ -38,6 +38,10 @@ class ToolError(Exception):
     """A local tool could not be run; stderr is deliberately not exposed."""
 
 
+class CommandFailed(ToolError):
+    """An allowed command ran but exited unsuccessfully; its streams stay private."""
+
+
 class SelectionError(Exception):
     """A connected device cannot be safely selected or accessed."""
 
@@ -53,6 +57,12 @@ class Connection:
     transport: str
     device: Device
     warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class LocalProperties:
+    values: dict[str, str | None]
+    failed: tuple[str, ...] = ()
 
 
 def _allowlisted(tool: str, args: list[str]) -> bool:
@@ -93,7 +103,7 @@ def _run(tool: str, args: list[str], operation: str) -> str:
     if result.returncode != 0:
         # Tool errors can include sensitive details. Never echo their raw streams.
         hint = "Android permissions" if tool == "getprop" else "the connection and permissions"
-        raise ToolError(f"{tool} failed while {operation}; check {hint} (raw diagnostics suppressed)")
+        raise CommandFailed(f"{tool} failed while {operation}; check {hint} (raw diagnostics suppressed)")
     return result.stdout
 
 
@@ -229,10 +239,24 @@ def read_adb_properties(serial: str) -> dict[str, str | None]:
     return values
 
 
-def read_local_properties() -> dict[str, str | None]:
-    """Read the same allowlisted keys on Android without adb or a device serial."""
+def read_local_properties() -> LocalProperties:
+    """Read local properties, retaining partial data only for nonzero exits.
+
+    A failing property command does not tell us whether a vendor restriction or
+    another problem caused it. Missing executables, OS errors and timeouts remain
+    hard errors. Unlike local mode, adb stays fail-fast because a failure can
+    indicate that the selected device disconnected during the comparison.
+    """
     values = {}
+    failed = []
     for key in ADB_PROPERTIES:
-        output = _run("getprop", [key], f"reading {key}")
-        values[key] = _property_value(output)
-    return values
+        try:
+            output = _run("getprop", [key], f"reading {key}")
+        except CommandFailed:
+            values[key] = None
+            failed.append(key)
+        else:
+            values[key] = _property_value(output)
+    if len(failed) == len(ADB_PROPERTIES):
+        raise ToolError("all Android getprop commands failed; check the phone and Android permissions (raw diagnostics suppressed)")
+    return LocalProperties(values, tuple(failed))

@@ -13,7 +13,14 @@ from .transport import (
 )
 
 
+# Keep machine-readable statuses and exit codes stable; the human label makes
+# clear that a positive result is an identity comparison, not device support.
 EXIT = {"supported": 0, "unknown": 1, "incompatible": 2, "error": 3}
+RESULT_LABEL = {
+    "supported": "reference identity match",
+    "unknown": "unknown",
+    "incompatible": "reference profile mismatch",
+}
 
 
 def parser() -> argparse.ArgumentParser:
@@ -26,18 +33,47 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--profile", help="compare against a specific profile ID, such as sweet")
     result.add_argument("--serial", help="select one adb/fastboot device; not used in local mode; do not publish it")
     result.add_argument("--json", action="store_true", help="emit JSON; review it for identifying details before sharing")
+    result.add_argument("--show-properties", action="store_true",
+                        help="show reported property values locally; they may identify the device")
     return result
 
 
+def _prepare_report(report: dict, show_properties: bool) -> dict:
+    """Hide observed property values after matching, without claiming anonymity."""
+    output = dict(report)
+    output["result_label"] = RESULT_LABEL[report["status"]]
+    output["properties_hidden"] = not show_properties
+    output["properties"] = {
+        key: value if show_properties or value is None else "[hidden]"
+        for key, value in report["properties"].items()
+    }
+    output["warnings"] = list(report["warnings"])
+    if not report["properties"]:
+        output["warnings"].append("Report details may identify a device; review before sharing.")
+    elif show_properties:
+        output["warnings"].append(
+            "Reported property values are displayed and may identify a device; review before sharing."
+        )
+    else:
+        output["warnings"].append(
+            "Property values are hidden, but other report details may identify a device; review before sharing."
+        )
+    return output
+
+
 def _print_report(report: dict) -> None:
-    print(f"Result: {report['status'].upper()}")
+    print(f"Result: {report['result_label'].upper()}")
     print(f"Transport: {report['transport']}")
     print(report["summary"])
     if report["profile"]:
         profile = report["profile"]
         print(f"Reference: {profile['name']} ({profile['id']}; {profile['support_level']})")
     if report["properties"]:
-        print("\nReported Android properties (missing/invalid values shown as unknown):")
+        if report["properties_hidden"]:
+            print("\nReported Android properties ([hidden] = present; unknown = missing/invalid/failed):")
+            print("  Values are hidden; use --show-properties only for private inspection.")
+        else:
+            print("\nReported Android properties (missing/invalid/failed values shown as unknown):")
         for name, value in report["properties"].items():
             print(f"  {name}: {value if value is not None else 'unknown'}")
     if report["checks"]:
@@ -68,12 +104,24 @@ def main(argv: list[str] | None = None) -> int:
         if args.transport == "local":
             if args.serial is not None:
                 raise SelectionError("--serial is for adb/fastboot selection and cannot be used with local mode")
-            values = read_local_properties()
+            properties = read_local_properties()
             warnings = (
-                "Local mode does not query a serial, but property values can still "
-                "identify a device; review before sharing.",
+                "Local mode does not query a serial; property values can still contain identifying details.",
             )
-            report = adb_report(values, profiles, args.profile, warnings, transport="local")
+            report = adb_report(properties.values, profiles, args.profile, warnings, transport="local")
+            if properties.failed:
+                report["failed_properties"] = list(properties.failed)
+                report["warnings"].append(
+                    "Local property commands failed for: " + ", ".join(properties.failed)
+                    + ". The cause is unknown; those values are unavailable and raw diagnostics are suppressed."
+                )
+                # A partial comparison must not be confused with a complete
+                # identity match or an unqualified profile mismatch.
+                report["status"] = "unknown"
+                report["summary"] = (
+                    "Some local property reads failed. This partial comparison is unknown, "
+                    "not a compatibility or flash-safety verdict."
+                )
         else:
             connection = discover(args.transport, args.serial)
             if connection.transport == "adb":
@@ -87,6 +135,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"Error: {exc}", file=sys.stderr)
         return EXIT["error"]
+    report = _prepare_report(report, args.show_properties)
     if args.json:
         print(json.dumps(report, indent=2, ensure_ascii=True))
     else:

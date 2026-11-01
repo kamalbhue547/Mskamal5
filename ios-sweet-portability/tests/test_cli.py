@@ -58,7 +58,7 @@ class CliTests(unittest.TestCase):
     def test_full_adb_cli_supported_is_redacted_and_read_only(self):
         code, out, err, commands = run_cli(["--transport", "adb"])
         self.assertEqual((code, err), (0, ""))
-        self.assertIn("Result: SUPPORTED", out)
+        self.assertIn("Result: REFERENCE IDENTITY MATCH", out)
         self.assertIn("not a hardware validation", out)
         self.assertIn("erases Android userdata", out)
         self.assertNotIn(PRIVATE, out)
@@ -89,9 +89,13 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 1)
         report = json.loads(out)
         self.assertEqual(report["status"], "unknown")
+        self.assertEqual(report["properties"], {})
+        self.assertTrue(report["properties_hidden"])
+        self.assertEqual(report["failed_properties"], [])
         self.assertEqual(commands, [["/mock/fastboot", "devices"]])
         self.assertNotIn(PRIVATE, out)
         self.assertIn("never to use fastboot getvar", report["warnings"][0])
+        self.assertFalse(any("values are displayed" in warning for warning in report["warnings"]))
 
     def test_auto_fastboot_text_explains_missing_adb_and_redacts_serial(self):
         code, out, err, commands = run_cli([], available=("fastboot",),
