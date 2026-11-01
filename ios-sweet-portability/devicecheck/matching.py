@@ -45,6 +45,7 @@ def _base(transport: str, properties: dict[str, str | None], warnings: tuple[str
         "profile": None,
         "summary": "No supported reference identity has been established.",
         "properties": properties,
+        "failed_properties": [],
         "checks": [],
         "warnings": list(warnings),
         "unknowns": list(COMMON_UNKNOWNS),

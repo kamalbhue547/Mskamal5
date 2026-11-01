@@ -25,12 +25,12 @@ substitute for reviewing files and Git history before publication.
    for the exact device, with build/firmware versions, observed test milestones,
    limitations and recovery considerations. `hardware_verified` is a human
    evidence label, not something this tool can automatically verify.
-4. Add mocked tests for matching, missing/conflicting properties, unknown
-   aliases, privacy and selection. Local Android tests must use fake `getprop`
-   output and preserve the narrow property allowlist; they are not proof that a
-   phone or vendor ROM works. Never use real serials or proprietary inputs in
-   fixtures. Proposed new commands must remain read-only and justified; do not
-   add `fastboot getvar` (upstream's notes prohibit it in their workflow).
+4. Add mocked tests for matching, missing/conflicting properties, partial reads,
+   default report privacy and selection. Local Android tests must use fake
+   `getprop` output and preserve the narrow property allowlist; they are not
+   proof that a phone or vendor ROM works. Never use real serials or proprietary
+   inputs in fixtures. Proposed new commands must remain read-only and justified;
+   do not add `fastboot getvar` (upstream's notes prohibit it in their workflow).
 
 ## Development and tests
 
@@ -54,7 +54,9 @@ repository. No physical device,
 Apple firmware, sudo, or network is needed to run the tests. If you run a
 physical-device test separately, state exact consent, mode, non-sensitive
 firmware details, commands, observed outcomes and what was *not* tested; do not
-conflate mocks, emulation and hardware results.
+conflate mocks, emulation and hardware results. Volunteers can follow the
+[privacy-conscious real-phone checklist](docs/android-phone.md#optional-help-validate-on-a-real-phone).
+Do not post unreviewed reports, even when property values are hidden.
 
 Before submitting, inspect the changes and ensure no sensitive artifacts or
 unrelated files are included:

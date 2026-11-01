@@ -158,9 +158,16 @@ class AndroidLocalTests(unittest.TestCase):
         self.assertIsNone(json.loads(out)["properties"]["ro.product.model"])
         self.assertNotIn("Secret", out)
 
-    def test_local_warns_when_a_custom_property_could_identify_the_device(self):
+    def test_local_hides_custom_properties_by_default_and_warns_when_shown(self):
         values = {**VALUES, "ro.product.model": "CUSTOM-FAKE-IDENTIFIER"}
         code, out, _, _ = self.run_with_properties(["--transport", "local", "--json"], values)
+        self.assertEqual(code, 1)
+        report = json.loads(out)
+        self.assertEqual(report["properties"]["ro.product.model"], "[hidden]")
+        self.assertNotIn("CUSTOM-FAKE-IDENTIFIER", out)
+        self.assertTrue(any("before sharing" in warning for warning in report["warnings"]))
+        code, out, _, _ = self.run_with_properties(
+            ["--transport", "local", "--json", "--show-properties"], values)
         self.assertEqual(code, 1)
         report = json.loads(out)
         self.assertEqual(report["properties"]["ro.product.model"], "CUSTOM-FAKE-IDENTIFIER")

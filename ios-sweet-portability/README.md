@@ -38,8 +38,10 @@ Android properties. On the phone, local mode reads the same keys using Android's
 getvar`, because the upstream phone workflow explicitly says not to. An `adb`
 server may start on the computer and an authorization prompt may appear on the
 phone. The selected adb serial is omitted from reports; local mode does not
-query one. In either mode, custom property values can still identify a device,
-so review all output before sharing it.
+query one. Reports hide observed property values by default, including in JSON.
+`--show-properties` displays them locally when needed, but custom properties can
+contain identifiers. Other report details can also identify a device, so review
+and redact all output before sharing it.
 
 ## Quick start (Android phone)
 
@@ -167,9 +169,10 @@ python3 -m devicecheck --transport local --json
 ```
 
 **Why:** this reads allowlisted properties from the phone itself and outputs
-JSON. It does not query a serial, but a custom property may still contain one;
-review and redact all output before sharing. See the
-[Android phone guide](docs/android-phone.md) for setup and limitations.
+JSON with property values hidden. It does not query a serial. Report details
+can still identify a device, so review and redact output before sharing. See the
+[Android phone guide](docs/android-phone.md) for setup, real-phone testing, and
+limitations.
 
 ### Compare against the `sweet` reference
 
@@ -187,10 +190,24 @@ is not proof that future porting is impossible.
 python3 -m devicecheck --transport adb --json
 ```
 
-**Why:** `--json` produces a JSON report for scripts or closer inspection.
-The tool suppresses the selected serial and raw tool errors, but ordinary
-property values may still identify a person or device. Review and redact any
-output before sharing it. Argument errors and `--help` still use normal text.
+**Why:** `--json` produces a machine-readable report. The `status` names and
+their exit-code meanings remain unchanged, but partial local read failures now
+return `unknown`/1 instead of error/3. Observed property values are now hidden
+by default (`[hidden]` for present values, `null` for missing/invalid/failed).
+Existing scripts that need the previous property values must explicitly add
+`--show-properties`. The report is **not anonymous**: review and redact it
+before sharing. Argument errors and `--help` still use normal text.
+
+### Show property values privately (optional)
+
+```sh
+python3 -m devicecheck --transport local --show-properties
+```
+
+**Why:** use this only when you need to inspect your own values locally. In
+local mode a custom property can contain a serial or another identifier; the
+tool cannot recognize it. Do not post unreviewed output. The same option can
+be combined with `--json` or `--transport adb`.
 
 ### Let the tool choose a transport
 
@@ -225,12 +242,12 @@ each test name. No phone, Apple firmware, or network is needed.
 
 ## Understanding the result
 
-| Result | Meaning | Exit code |
+| Display label (JSON `status`) | Meaning | Exit code |
 | --- | --- | --- |
-| `supported` | The reported identity strictly matches a reviewed reference profile. It is **not** a hardware, firmware, recovery, or flash-safety verification. | `0` |
-| `unknown` | There is not enough matching evidence, or only fastboot enumeration was performed. This is normal for many phones. | `1` |
-| `incompatible` | With an explicitly selected profile, both reported codename fields agree on a different device. This is a mismatch with that profile only. | `2` |
-| Error | A tool, connection, device-selection, or profile problem prevented the check. Argument usage errors also return `2`. | `3` for program errors |
+| **Reference identity match** (`supported`) | Reported identity matches a reviewed profile. It is **not** a hardware, firmware, recovery, or flash-safety verification. | `0` |
+| **Unknown** (`unknown`) | There is not enough evidence, some local property commands failed, or only fastboot enumeration was performed. This is normal for many phones. | `1` |
+| **Reference profile mismatch** (`incompatible`) | With an explicitly selected profile, both reported codename fields agree on a different device. This is a mismatch with that profile only. | `2` |
+| Error (`error`) | A tool, connection, device-selection, or profile problem prevented the check. Argument usage errors also return `2`. | `3` for program errors |
 
 For `sweet`, a positive identity result requires both Android codename fields,
 manufacturer, model, and an explicitly sourced SoC label to match; a reported

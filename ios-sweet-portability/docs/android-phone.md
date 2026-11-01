@@ -93,9 +93,12 @@ python3 -m devicecheck --transport local
 **Why:** `local` runs Android's `/system/bin/getprop` for individual allowlisted
 property keys on this phone. It does not use adb, fastboot, a serial, a shell
 script, or a full property dump. It compares the reported values with the
-included profile; missing or inaccessible data can result in `unknown` or a
-helpful error. `auto` remains the computer-oriented adb/fastboot mode, so
-include `--transport local` on the phone.
+included profile. If some local property commands fail, the report lists their
+names, treats those values as unavailable, and returns `unknown` with a warning.
+If every command fails, the binary cannot run, or a command times out, it
+returns an error. The cause of a failed read is not known automatically. `auto`
+remains the computer-oriented adb/fastboot mode, so include `--transport local`
+on the phone.
 
 To compare specifically with the `sweet` reference (not to install it):
 
@@ -109,26 +112,61 @@ Optional JSON output:
 python3 -m devicecheck --transport local --json
 ```
 
+Reported property values are **hidden by default**, in both text and JSON. A
+`[hidden]` value means that a value was present; `unknown` (or `null` in JSON)
+means missing, invalid or failed. The report can still reveal information through
+matching results, profile details or errors, so it is **not anonymous**. Review
+and redact every report before sharing it.
+
+If you need to inspect property values privately on your phone, opt in with:
+
+```sh
+python3 -m devicecheck --transport local --show-properties
+```
+
 The tool does not query a hardware serial in local mode, but custom properties
-can still contain serials or other identifying details. It cannot recognize a
-serial embedded in those values because it does not read the serial. Review and
-redact **all** output before sharing; never share an IMEI, serial, key, or
-private log. `--serial` is for selecting an adb/fastboot device and is rejected
-in local mode.
+can contain serials or other identifying details. It cannot recognize a serial
+embedded in those values because it does not read the serial. Never share an
+IMEI, serial, key, private log or unreviewed `--show-properties` output.
+`--serial` is for selecting an adb/fastboot device and is rejected in local
+mode.
 
 ## Understand the result
 
-- **`supported`** means the reported identity matches the strict `sweet`
-  reference profile. It does **not** verify the physical device, a working
-  iOS port, bootloader, recovery, or flash safety.
-- **`unknown`** means there is not enough matching evidence. This is expected
-  for most phones, and even a `sweet` ROM may omit a required property.
-- **`incompatible`** can occur only when a profile was explicitly selected and
-  both reported codename fields agree on a different device. It is a mismatch
-  with that profile, not proof that a future port is impossible.
+- **Reference identity match** (JSON `supported`) means the reported identity
+  matches the strict `sweet` profile. It does **not** verify the physical device,
+  a working iOS port, bootloader, recovery, or flash safety.
+- **Unknown** (JSON `unknown`) means there is not enough matching evidence or
+  some local reads failed. This is expected for most phones, and even a `sweet`
+  ROM may omit a required property.
+- **Reference profile mismatch** (JSON `incompatible`) can occur only when a
+  profile was explicitly selected and both reported codename fields agree on a
+  different device. It is not proof that a future port is impossible.
 - **Error** means a tool, permission, or profile problem prevented the check.
 
 See the [matching rules and exit codes](device-check.md) for details.
+
+## Optional: help validate on a real phone
+
+Physical Android and Termux behavior has **not yet been verified** for this
+project. If you choose to help test, first complete steps 1–4 above on your own
+phone, without rooting or changing security settings. From the project folder:
+
+```sh
+python3 -m devicecheck --transport local
+echo "Exit code: $?"
+```
+
+Run the second line immediately after the check. An exit code of `1` means
+`unknown`, not necessarily a failure; `3` means a tool or permission error.
+Record whether the mocked tests in step 4 ended with `OK`. If you are comfortable
+sharing, report only your phone's public model name, Android major version,
+Termux installation source, whether the tests passed, and the result label and
+exit code. You may also describe an error **after** removing personal details.
+Do not post screenshots, property values, serials, IMEIs, build fingerprints,
+keys, private logs, or full reports. Even a model/version combination can be
+identifying in context; share only what you choose. A successful run validates
+only that particular checker/environment combination, not an iOS boot or port.
 
 ## Troubleshooting
 
