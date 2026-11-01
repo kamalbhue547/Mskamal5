@@ -1,49 +1,56 @@
-# Mskamal5
+# devicecheck
 
-Software Developer | Building cool things for the web | Open Source Enthusiast
+[![CI](https://github.com/kamalbhue547/Mskamal5/actions/workflows/python-package.yml/badge.svg)](https://github.com/kamalbhue547/Mskamal5/actions/workflows/python-package.yml)
+![Python 3.10–3.14](https://img.shields.io/badge/python-3.10--3.14-blue)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-## Featured project: iOS Sweet Portability Lab
+A dependency-free Python CLI for read-only comparison of Android phone properties
+with documented reference profiles. It supports adb on a host and local getprop
+on Android/Termux. Fastboot mode only enumerates devices. It **does not install
+iOS, unlock, reboot, erase or flash**. Reported properties can be spoofed: a
+match is not a hardware verification or permission to flash. Upstream's separate
+experimental root-image flash erases Android userdata.
 
-A research toolkit for **read-only Android device identification** from Linux
-or an Android phone running Termux. It is not an iOS installer and does not
-unlock, reboot, or flash a phone.
+## Install and run
 
-> Upstream's separate experimental root-image flash erases Android `userdata`.
-> The toolkit below does not flash devices.
-
-### Run it on an Android phone
-
-Install Termux from its [official instructions](https://github.com/termux/termux-app#installation),
-then follow the [step-by-step Android guide](ios-sweet-portability/docs/android-phone.md).
-The checker can read this phone's reported properties without a computer or
-root, but compatibility varies and it has not been tested on a physical phone.
-
-### Try it on Linux
-
-For a first-time checkout, install Git and Python 3.10 or newer, then paste:
+Requires Python 3.10 or newer. From a checkout:
 
 ```sh
-git clone https://github.com/kamalbhue547/Mskamal5.git &&
-cd Mskamal5/ios-sweet-portability &&
-python3 -m unittest discover -s tests -q &&
-python3 -m devicecheck --help
+python -m pip install .
+devicecheck --list-profiles
+devicecheck --transport adb --explain
+# On an Android phone with Termux:
+devicecheck --transport local --json
 ```
 
-These commands download the project, run its mocked tests, and show the CLI
-help. They do not need a phone.
+Use `--profile-dir DIR` to load your own JSON profiles instead of bundled ones;
+validation checks structure, not the truth of their evidence. Values are hidden
+by default; `--show-properties` displays potentially identifying information.
+Review all output before sharing. `--dry-run` is an alias for `--explain`; the
+tool is always read-only and already shows comparison checks.
 
-To install the `devicecheck` command in a virtual environment, start from the
-repository root (`cd ..` if you just ran the commands above):
+Example (abbreviated, synthetic):
 
-```sh
-python3 -m venv .venv &&
-. .venv/bin/activate &&
-python -m pip install -e . &&
-devicecheck --version &&
-devicecheck --list-profiles &&
-python -m unittest discover -q
+```text
+Result: REFERENCE IDENTITY MATCH
+Transport: adb
+Comparison:
+  ro.product.device: match (expected: sweet or sweetin)
+  ro.soc.model: not available (expected: SM7150 or Snapdragon 732G)
 ```
 
-The CLI has no third-party runtime dependencies; installation may download
-Python build tools. For connecting a device, more commands, and limitations,
-see the [step-by-step guide](ios-sweet-portability/README.md#quick-start-linux).
+On Android 11 and earlier, an absent `ro.soc.model` is reported as not available;
+the SoC remains unverified. This checker has not been tested on a physical
+phone. Tests use synthetic and mocked output, not real device captures.
+
+| Exit code | Meaning |
+| --- | --- |
+| 0 | Reference identity match (or successful profile listing) |
+| 1 | Unknown / insufficient or conflicting evidence |
+| 2 | Explicitly selected profile mismatch |
+| 3 | Error |
+
+See the [full guide](ios-sweet-portability/README.md),
+[Android instructions](ios-sweet-portability/docs/android-phone.md), and
+[contribution guide](ios-sweet-portability/CONTRIBUTING.md). Run tests with
+`python -m unittest discover -q` from the repository root.
