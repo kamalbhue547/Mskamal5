@@ -7,7 +7,22 @@
     "codename": "sweet",
     "manufacturer": "Xiaomi",
     "model": "Redmi Note 10 Pro",
-    "soc_labels": ["SM7150", "Snapdragon 732G"]
+    "soc_labels": [
+      "SM7150",
+      "Snapdragon 732G",
+      "SM7150-AC"
+    ],
+    "codenames": [
+      "sweetin"
+    ],
+    "models": [
+      "M2101K6G",
+      "M2101K6R",
+      "M2101K6T",
+      "M2101K6I",
+      "M2101K6P",
+      "Redmi Note 10 Pro Max"
+    ]
   },
   "platform": {
     "cpu_arch": "arm64"
@@ -32,6 +47,26 @@
       "subject": "CPU architecture",
       "url": "https://github.com/dipa-studio/ios-sweet/blob/45263bee51df4a0f55cdf9c649af886399488ddb/shim/start.S#L1-L4",
       "note": "Upstream's target shim uses an arm64 Linux Image header; Android ABI property strings are not documented there."
+    },
+    {
+      "subject": "Variant codenames",
+      "url": "https://github.com/xiaomi-sm6150/android_device_xiaomi_sweet/blob/lineage-19.0/README.md",
+      "note": "Device tree identifies sweet and sweetin; variant-specific hardware is not verified."
+    },
+    {
+      "subject": "Regional model numbers",
+      "url": "https://miuirom.org/phones/redmi-note-10-pro",
+      "note": "Lists global, Japan and Thailand model numbers."
+    },
+    {
+      "subject": "Indian variants",
+      "url": "https://www.phonecopy.com/en/phones/view/xiaomi_redmi_note_10_pro",
+      "note": "Lists M2101K6I with sweetin; other identifiers need physical verification."
+    },
+    {
+      "subject": "Indian model number",
+      "url": "https://mifirmware.com/redmi-note-10-pro/",
+      "note": "Lists M2101K6P for sweetin."
     }
   ]
 }

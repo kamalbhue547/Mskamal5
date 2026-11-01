@@ -16,6 +16,10 @@ from dataclasses import dataclass
 # same narrow list is used for adb and on-phone getprop.
 ADB_PROPERTIES = (
     "ro.product.device",
+    "ro.product.vendor.device",
+    "ro.product.odm.device",
+    "ro.product.marketname",
+    "ro.build.version.sdk",
     "ro.build.product",
     "ro.product.manufacturer",
     "ro.product.model",

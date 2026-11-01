@@ -23,9 +23,9 @@ class ProfileTests(unittest.TestCase):
         p = by_id["sweet"]
         self.assertEqual(p.support_level, "upstream_reference")
         self.assertEqual((p.codename, p.manufacturer, p.model), ("sweet", "Xiaomi", "Redmi Note 10 Pro"))
-        self.assertEqual(p.soc_labels, ("SM7150", "Snapdragon 732G"))
+        self.assertEqual(p.soc_labels, ("SM7150", "Snapdragon 732G", "SM7150-AC"))
         self.assertEqual(p.cpu_arch, "arm64")
-        self.assertTrue(all("45263bee51df4a0f55cdf9c649af886399488ddb" in e.url for e in p.evidence))
+        self.assertTrue(any("45263bee51df4a0f55cdf9c649af886399488ddb" in e.url for e in p.evidence))
 
     def test_multiple_profiles_can_be_loaded_without_a_fixed_count_or_order(self):
         self.write()

@@ -88,13 +88,18 @@ class CliTests(unittest.TestCase):
                         out,
                     )
 
+    def test_custom_profile_directory_is_used(self):
+        code, out, err, commands = run_cli(["--list-profiles", "--profile-dir", "/nonexistent-devicecheck-profiles", "--json"])
+        self.assertEqual((code, err, commands), (3, "", []))
+        self.assertIn("profile directory", json.loads(out)["error"])
+
     def test_list_profiles_reports_invalid_data_without_device_access(self):
         error = ProfileError("invalid profile")
         with patch("devicecheck.__main__.load_profiles", side_effect=error):
             code, out, err, commands = run_cli(["--list-profiles", "--json"])
         self.assertEqual((code, err, commands), (3, "", []))
         self.assertEqual(
-            json.loads(out), {"status": "error", "error": "invalid profile"}
+            json.loads(out), {"schema_version": 1, "status": "error", "error": "invalid profile"}
         )
 
     def test_list_profiles_rejects_device_only_options_before_loading(self):

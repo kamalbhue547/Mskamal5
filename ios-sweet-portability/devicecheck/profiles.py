@@ -32,6 +32,8 @@ class Profile:
     soc_labels: tuple[str, ...]
     cpu_arch: str | None
     evidence: tuple[Evidence, ...]
+    codenames: tuple[str, ...] = ()
+    models: tuple[str, ...] = ()
 
 
 # The checked-in profile is also packaged here in installed wheels. Normal
@@ -73,6 +75,17 @@ def _parse_profile(data: object, path: Path) -> Profile:
     codename = identity_text("codename")
     manufacturer = identity_text("manufacturer")
     model = identity_text("model")
+    def aliases(key: str) -> tuple[str, ...]:
+        raw = identity.get(key, [])
+        if not isinstance(raw, list):
+            raise ProfileError(f"identity.{key} must be a list")
+        result = tuple(_text(item, f"identity.{key} entry") for item in raw)
+        if len({item.casefold() for item in result}) != len(result):
+            raise ProfileError(f"identity.{key} must not contain duplicates")
+        return result
+
+    codenames = aliases("codenames")
+    models = aliases("models")
     labels = identity.get("soc_labels")
     if not isinstance(labels, list) or (not labels and level != "research_only"):
         raise ProfileError("identity.soc_labels must be a list (non-empty for a supported reference)")
@@ -108,7 +121,7 @@ def _parse_profile(data: object, path: Path) -> Profile:
             raise ProfileError("evidence URLs must be valid absolute HTTPS URLs without credentials")
         evidence.append(Evidence(_text(item.get("subject"), "evidence.subject"), url,
                                  _text(item.get("note"), "evidence.note", 500)))
-    return Profile(profile_id, name, level, codename, manufacturer, model, soc_labels, cpu_arch, tuple(evidence))
+    return Profile(profile_id, name, level, codename, manufacturer, model, soc_labels, cpu_arch, tuple(evidence), codenames, models)
 
 
 def load_profiles(directory: Path | None = None) -> tuple[Profile, ...]:

@@ -92,12 +92,12 @@ class MatchTests(unittest.TestCase):
         self.assertEqual(report["status"], "unknown")
 
     def test_wrong_model_is_unknown_not_incompatible(self):
-        report = self.result({"ro.product.model": "Redmi Note 10 Pro Max"})
+        report = self.result({"ro.product.model": "Other phone"})
         self.assertEqual(report["status"], "unknown")
 
-    def test_no_undocumented_sweetin_alias_is_assumed(self):
+    def test_sweetin_alias_is_recognized(self):
         report = self.result({"ro.product.device": "sweetin", "ro.build.product": "sweetin"})
-        self.assertEqual(report["status"], "unknown")
+        self.assertEqual(report["status"], "supported")
 
     def test_research_only_cannot_be_promoted_by_matching_properties(self):
         p = replace(self.profiles[0], support_level="research_only")
@@ -117,6 +117,32 @@ class MatchTests(unittest.TestCase):
         report = self.result(profiles=(self.profiles[0], duplicate_codename))
         self.assertEqual(report["status"], "unknown")
         self.assertIn("More than one", report["summary"])
+
+    def test_stock_android_11_regional_model(self):
+        report = self.result({"ro.product.model": "M2101K6G", "ro.soc.model": None,
+                              "ro.build.version.sdk": "30", "ro.product.marketname": "Redmi Note 10 Pro"})
+        self.assertEqual(report["status"], "supported")
+        self.assertEqual(next(c for c in report["checks"] if c["field"] == "ro.soc.model")["result"], "not available")
+        self.assertTrue(any("not verified" in w for w in report["warnings"]))
+
+    def test_variant_and_fallbacks(self):
+        for field in ("ro.product.vendor.device", "ro.product.odm.device"):
+            report = self.result({"ro.product.device": None, field: "sweetin", "ro.build.product": "sweetin",
+                                  "ro.product.model": "M2101K6I", "ro.soc.model": None,
+                                  "ro.build.version.release": "11"})
+            self.assertEqual(report["status"], "supported")
+            self.assertEqual(report["checks"][0]["field"], field)
+        report = self.result({"ro.product.model": None, "ro.product.marketname": "Redmi Note 10 Pro"})
+        self.assertEqual(report["status"], "supported")
+
+    def test_unknown_version_or_modern_missing_soc_does_not_match(self):
+        for sdk in (None, "31", "invalid"):
+            report = self.result({"ro.soc.model": None, "ro.build.version.sdk": sdk})
+            self.assertEqual(report["status"], "unknown")
+
+    def test_conflicting_marketing_name_does_not_match(self):
+        report = self.result({"ro.product.model": "M2101K6G", "ro.product.marketname": "Other"})
+        self.assertEqual(report["status"], "unknown")
 
     def test_fastboot_always_unknown_without_getvar(self):
         report = fastboot_report()

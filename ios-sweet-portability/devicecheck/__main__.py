@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
 
 from . import __version__
 from .matching import adb_report, fastboot_report
@@ -26,7 +27,7 @@ RESULT_LABEL = {
 
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(
-        prog="python3 -m devicecheck",
+        prog="devicecheck",
         description=(
             "Read-only identity comparison; "
             "no unlock, reboot, flash, erase or installation."
@@ -46,6 +47,9 @@ def parser() -> argparse.ArgumentParser:
         "--list-profiles", action="store_true",
         help="list bundled reference profiles without connecting to a device",
     )
+    result.add_argument("--profile-dir", type=Path, help="load profiles from this directory instead of bundled profiles")
+    result.add_argument("--explain", "--dry-run", action="store_true",
+                        help="show comparison checks (already shown by default; all operations are read-only)")
     result.add_argument(
         "--profile",
         help="compare against a specific profile ID, such as sweet",
@@ -135,7 +139,7 @@ def main(argv: list[str] | None = None) -> int:
             "or --show-properties"
         )
     try:
-        profiles = load_profiles()
+        profiles = load_profiles(args.profile_dir)
         if args.list_profiles:
             entries = [
                 {"id": p.id, "name": p.name, "support_level": p.support_level}
@@ -143,7 +147,7 @@ def main(argv: list[str] | None = None) -> int:
             ]
             if args.json:
                 print(json.dumps(
-                    {"profiles": entries}, indent=2, ensure_ascii=True
+                    {"schema_version": 1, "profiles": entries}, indent=2, ensure_ascii=True
                 ))
             else:
                 for entry in entries:
@@ -188,7 +192,7 @@ def main(argv: list[str] | None = None) -> int:
                 report = fastboot_report(connection.warnings, selected)
     except (ProfileError, SelectionError, ToolError) as exc:
         if args.json:
-            print(json.dumps({"status": "error", "error": str(exc)}, indent=2))
+            print(json.dumps({"schema_version": 1, "status": "error", "error": str(exc)}, indent=2, ensure_ascii=True))
         else:
             print(f"Error: {exc}", file=sys.stderr)
         return EXIT["error"]

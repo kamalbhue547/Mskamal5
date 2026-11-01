@@ -40,6 +40,7 @@ def _expected(value: str | None) -> tuple[str, ...]:
 
 def _base(transport: str, properties: dict[str, str | None], warnings: tuple[str, ...]) -> dict:
     return {
+        "schema_version": 1,
         "status": "unknown",
         "transport": transport,
         "profile": None,
@@ -79,13 +80,17 @@ def adb_report(values: dict[str, str | None], profiles: tuple[Profile, ...],
                *, transport: str = "adb") -> dict:
     """Compare reported Android properties from adb or local on-phone mode."""
     report = _base(transport, values, warnings)
-    device = values.get("ro.product.device")
+    device_field = next((key for key in (
+        "ro.product.device", "ro.product.vendor.device", "ro.product.odm.device"
+    ) if values.get(key)), "ro.product.device")
+    device = values.get(device_field)
     build = values.get("ro.build.product")
     if selected_id is not None:
         # CLI verifies it before contacting any devices.
         candidates = [p for p in profiles if p.id == selected_id]
     else:
-        candidates = [p for p in profiles if _same(device, p.codename) or _same(build, p.codename)]
+        candidates = [p for p in profiles if any(_same(value, code) for value in (device, build)
+                          for code in (*_expected(p.codename), *p.codenames))]
 
     if not candidates:
         report["summary"] = "No profile matches the reported codename; this is not a judgment about future porting."
@@ -100,13 +105,30 @@ def adb_report(values: dict[str, str | None], profiles: tuple[Profile, ...],
     profile = candidates[0]
     report["profile"] = {"id": profile.id, "name": profile.name, "support_level": profile.support_level}
     report["evidence"] = [asdict(item) for item in profile.evidence]
+    codes = (*_expected(profile.codename), *profile.codenames) if profile.codename else ()
+    models = (*_expected(profile.model), *profile.models) if profile.model else ()
+    model_field = ("ro.product.marketname" if not values.get("ro.product.model")
+                   and values.get("ro.product.marketname") else "ro.product.model")
+    sdk = values.get("ro.build.version.sdk")
+    release = values.get("ro.build.version.release")
+    old_android = (sdk.isdecimal() and int(sdk) <= 30) if sdk else (
+        bool(release and release.split(".")[0].isdecimal() and int(release.split(".")[0]) <= 11)
+    )
     identity_checks = [
-        _check("ro.product.device", device, _expected(profile.codename)),
-        _check("ro.build.product", build, _expected(profile.codename)),
+        _check(device_field, device, codes),
+        _check("ro.build.product", build, codes),
         _check("ro.product.manufacturer", values.get("ro.product.manufacturer"), _expected(profile.manufacturer)),
-        _check("ro.product.model", values.get("ro.product.model"), _expected(profile.model)),
+        _check(model_field, values.get(model_field), models),
         _check("ro.soc.model", values.get("ro.soc.model"), profile.soc_labels),
     ]
+    market = values.get("ro.product.marketname")
+    if market and model_field != "ro.product.marketname":
+        identity_checks.append(_check("ro.product.marketname", market, models))
+    if old_android and not values.get("ro.soc.model") and profile.soc_labels:
+        identity_checks[4]["result"] = "not available"
+        report["warnings"].append(
+            "SoC model was not reported on Android 11 or older; the SoC was not verified."
+        )
     report["checks"] = list(identity_checks)
     abi_conflict = False
     if profile.cpu_arch and profile.cpu_arch.casefold() == "arm64":
@@ -126,13 +148,13 @@ def adb_report(values: dict[str, str | None], profiles: tuple[Profile, ...],
     # only if two independent *property fields* agree on a different codename.
     # They may still be generated from the same ROM data; no hardware claim.
     if (selected_id is not None and profile.codename is not None and device and build
-            and _same(device, build) and not _same(device, profile.codename)):
+            and _same(device, build) and not any(_same(device, code) for code in codes)):
         report["status"] = "incompatible"
         report["summary"] = (
             "Both reported codename fields differ from the explicitly selected reference profile. "
             "Incompatible means identity mismatch with that profile only, not impossible to port."
         )
-    elif all(check["result"] == "match" for check in identity_checks) and not abi_conflict:
+    elif all(check["result"] in {"match", "not available"} for check in identity_checks) and not abi_conflict:
         if profile.support_level in {"upstream_reference", "hardware_verified"}:
             report["status"] = "supported"
             report["summary"] = (
@@ -141,7 +163,7 @@ def adb_report(values: dict[str, str | None], profiles: tuple[Profile, ...],
             )
         else:
             report["summary"] = "The identity matches research-only data, but no verified port is recorded."
-    elif abi_conflict and all(check["result"] == "match" for check in identity_checks):
+    elif abi_conflict and all(check["result"] in {"match", "not available"} for check in identity_checks):
         report["summary"] = (
             "Identity strings match, but the reported 64-bit Android ABI is different or unrecognized. "
             "This is not proof of the physical CPU or hardware incompatibility."
