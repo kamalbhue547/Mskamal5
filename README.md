@@ -4,11 +4,19 @@ Software Developer | Building cool things for the web | Open Source Enthusiast
 
 ## Featured project: iOS Sweet Portability Lab
 
-A Linux research toolkit for **read-only Android device identification**. It is
-not an iOS installer and does not unlock, reboot, or flash a phone.
+A research toolkit for **read-only Android device identification** from Linux
+or an Android phone running Termux. It is not an iOS installer and does not
+unlock, reboot, or flash a phone.
 
 > Upstream's separate experimental root-image flash erases Android `userdata`.
 > The toolkit below does not flash devices.
+
+### Run it on an Android phone
+
+Install Termux from its [official instructions](https://github.com/termux/termux-app#installation),
+then follow the [step-by-step Android guide](ios-sweet-portability/docs/android-phone.md).
+The checker can read this phone's reported properties without a computer or
+root, but compatibility varies and it has not been tested on a physical phone.
 
 ### Try it on Linux
 

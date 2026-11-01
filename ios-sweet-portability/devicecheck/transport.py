@@ -1,4 +1,4 @@
-"""A narrow allowlist of adb/fastboot read-only operations.
+"""A narrow allowlist of adb/fastboot and Android-local read-only operations.
 
 Do not add generic shell execution. In particular, fastboot getvar is excluded:
 upstream's phone-workflow handoff says never to use it.
@@ -12,7 +12,8 @@ from dataclasses import dataclass
 
 
 # Query individually instead of downloading the entire property set, which can
-# contain serial numbers, account-related state or other identifying data.
+# contain serial numbers, account-related state or other identifying data. The
+# same narrow list is used for adb and on-phone getprop.
 ADB_PROPERTIES = (
     "ro.product.device",
     "ro.build.product",
@@ -29,6 +30,8 @@ ADB_PROPERTIES = (
     "ro.boot.vbmeta.device_state",
 )
 TIMEOUT_SECONDS = 8
+# Use the Android system binary directly; Termux's PATH need not include it.
+ANDROID_GETPROP = "/system/bin/getprop"
 
 
 class ToolError(Exception):
@@ -41,7 +44,7 @@ class SelectionError(Exception):
 
 @dataclass(frozen=True)
 class Device:
-    serial: str  # Only used for local targeting; never included in reports.
+    serial: str  # Only used to target an adb/fastboot device; never included in reports.
     state: str
 
 
@@ -55,6 +58,8 @@ class Connection:
 def _allowlisted(tool: str, args: list[str]) -> bool:
     if tool == "fastboot":
         return args == ["devices"]
+    if tool == "getprop":
+        return len(args) == 1 and args[0] in ADB_PROPERTIES
     if tool != "adb":
         return False
     if args == ["devices"]:
@@ -65,8 +70,8 @@ def _allowlisted(tool: str, args: list[str]) -> bool:
 
 def _run(tool: str, args: list[str], operation: str) -> str:
     if not _allowlisted(tool, args):
-        raise ToolError("refusing a command outside the read-only adb/fastboot allowlist")
-    path = shutil.which(tool)
+        raise ToolError("refusing a command outside the read-only device-check allowlist")
+    path = ANDROID_GETPROP if tool == "getprop" else shutil.which(tool)
     if path is None:
         raise ToolError(f"{tool} is not installed or is not on PATH; install Android SDK Platform Tools")
     try:
@@ -76,12 +81,19 @@ def _run(tool: str, args: list[str], operation: str) -> str:
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
-        raise ToolError(f"{tool} timed out while {operation}; check the connection and permissions") from exc
+        hint = "Android permissions" if tool == "getprop" else "the connection and permissions"
+        raise ToolError(f"{tool} timed out while {operation}; check {hint}") from exc
     except OSError as exc:
+        if tool == "getprop":
+            raise ToolError(
+                "could not run Android /system/bin/getprop; use local mode on a "
+                "compatible Android phone and check permissions"
+            ) from exc
         raise ToolError(f"could not run {tool} while {operation}; check installation and permissions") from exc
     if result.returncode != 0:
-        # adb/fastboot errors can include serials. Never echo their raw streams.
-        raise ToolError(f"{tool} failed while {operation}; check the connection and permissions (raw diagnostics suppressed)")
+        # Tool errors can include sensitive details. Never echo their raw streams.
+        hint = "Android permissions" if tool == "getprop" else "the connection and permissions"
+        raise ToolError(f"{tool} failed while {operation}; check {hint} (raw diagnostics suppressed)")
     return result.stdout
 
 
@@ -214,4 +226,13 @@ def read_adb_properties(serial: str) -> dict[str, str | None]:
         # Keys are constants, not user input; no shell script or arbitrary command.
         output = _run("adb", ["-s", serial, "shell", "getprop", key], f"reading {key}")
         values[key] = _property_value(output, serial)
+    return values
+
+
+def read_local_properties() -> dict[str, str | None]:
+    """Read the same allowlisted keys on Android without adb or a device serial."""
+    values = {}
+    for key in ADB_PROPERTIES:
+        output = _run("getprop", [key], f"reading {key}")
+        values[key] = _property_value(output)
     return values

@@ -26,9 +26,11 @@ substitute for reviewing files and Git history before publication.
    limitations and recovery considerations. `hardware_verified` is a human
    evidence label, not something this tool can automatically verify.
 4. Add mocked tests for matching, missing/conflicting properties, unknown
-   aliases, privacy and selection. Never use real serials or proprietary inputs
-   in fixtures. Proposed new commands must remain read-only and justified;
-   do not add `fastboot getvar` (upstream's notes prohibit it in their workflow).
+   aliases, privacy and selection. Local Android tests must use fake `getprop`
+   output and preserve the narrow property allowlist; they are not proof that a
+   phone or vendor ROM works. Never use real serials or proprietary inputs in
+   fixtures. Proposed new commands must remain read-only and justified; do not
+   add `fastboot getvar` (upstream's notes prohibit it in their workflow).
 
 ## Development and tests
 
